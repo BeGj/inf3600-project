@@ -1,8 +1,8 @@
 # Python
-backend/.venv/
+**/.venv/
 **/__pycache__/
 .env
 
 # Node
-frontend/node_modules/
+**/node_modules/
 frontend/dist/
