@@ -1,7 +1,7 @@
 # INF-3600 Project
 
 ## Backend
-requires uv
+requires uv. Boilerplate setup based on https://github.com/astral-sh/uv-fastapi-example 
 - `uv run fastapi dev`
 - http://127.0.0.1:8000/docs
 
