@@ -14,3 +14,14 @@ requires node lts and npm
 ## experiment
 Requires uv.
 - Various python scripts for experimenting
+
+## Datasets
+Prepared datasets are stored under `datasets/`. The generated image, mask, and metadata files are ignored by Git.
+
+From `notebooks/`, run:
+
+```powershell
+uv sync
+uv run python scripts/prepare_morocco_buildings_lora_dataset.py --output-dir ../datasets/houses
+uv run python scripts/prepare_wroclaw_trees_lora_dataset.py --output-dir ../datasets/trees
+```
