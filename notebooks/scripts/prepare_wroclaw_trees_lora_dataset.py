@@ -5,6 +5,7 @@ from pathlib import Path
 
 from datasets import load_dataset
 from PIL import Image, ImageDraw
+from tqdm import tqdm
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -60,8 +61,9 @@ def main():
     metadata_path = args.output_dir / "metadata.jsonl"
     count = 0
 
+    total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(dataset):
+        for index, row in enumerate(tqdm(dataset, total=total, desc="Building tree pairs")):
             image = row[args.image_column]
             metadata = row[args.metadata_column]
 

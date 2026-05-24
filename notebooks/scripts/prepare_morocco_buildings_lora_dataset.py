@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 from datasets import load_dataset
 from PIL import Image
+from tqdm import tqdm
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -121,8 +122,9 @@ def main():
     metadata_path = args.output_dir / "metadata.jsonl"
     count = 0
 
+    total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(dataset):
+        for index, row in enumerate(tqdm(dataset, total=total, desc="Building image/mask pairs")):
             image = row[image_column]
             mask = row[mask_column]
 
