@@ -1,0 +1,8 @@
+# Strips outputs/execution counts from notebooks before they are committed, so
+# generated cell output never bloats git history. See notebooks/README.md.
+# One-time per clone:  uv tool install pre-commit && pre-commit install
+repos:
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      - id: nbstripout

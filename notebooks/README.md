@@ -13,6 +13,20 @@ uv run jupyter lab
 GPU is assumed (CUDA 12.8 wheels are pinned in `pyproject.toml`). Generated
 images, masks, dataset files, and trained weights are git-ignored.
 
+### Notebook output stripping
+
+Cell outputs are stripped from notebooks before commit so generated content
+never bloats git history. This is enforced by a [`nbstripout`](https://github.com/kynan/nbstripout)
+pre-commit hook (`.pre-commit-config.yaml`). Enable it once per clone:
+
+```bash
+uv tool install pre-commit
+pre-commit install
+```
+
+`.gitattributes` also registers `nbstripout` as a git filter for clean diffs; to
+activate that locally run `uv tool install nbstripout && nbstripout --install`.
+
 ## Dataset preparation
 
 The training notebooks read prepared datasets from `../datasets/`. Generate them

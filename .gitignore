@@ -12,6 +12,10 @@ frontend/dist/
 backend/models/**/*.safetensors
 backend/models/**/*.bin
 
+# Notebook training outputs (peft checkpoints + sample renders are regenerable).
+notebooks/lora-satellite-inpaint/
+notebooks/inpaint_result.png
+
 # Datasets (keep structure, ignore contents)
 datasets/*
 !datasets/houses/
