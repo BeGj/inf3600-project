@@ -7,6 +7,10 @@ from datasets import load_dataset
 from PIL import Image, ImageDraw
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "datasets" / "trees"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Convert the Wroclaw trees dataset into image/mask pairs for LoRA training."
@@ -18,7 +22,7 @@ def parse_args():
     )
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--subset", type=str, default=None)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--image-column", type=str, default="images")
     parser.add_argument("--metadata-column", type=str, default="metadata")
     parser.add_argument("--prompt", type=str, default="satellite view of trees, canopy cover, urban vegetation")
