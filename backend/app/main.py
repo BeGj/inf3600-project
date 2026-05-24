@@ -1,23 +1,43 @@
-from fastapi import Depends, FastAPI
+"""Satellite generative-fill backend.
 
-from .dependencies import get_query_token, get_token_header
-from .internal import admin
-from .routers import items, users
+Loads the SD1.5-inpainting pipeline (plus registry LoRA adapters) once at startup,
+then serves catalogue search and inpainting over HTTP.
+"""
 
-app = FastAPI(dependencies=[Depends(get_query_token)])
+import os
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from .inference.pipeline import engine
+from .routers import api
+
+# Comma-separated origins; defaults to the Vite dev server.
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
 
 
-app.include_router(users.router)
-app.include_router(items.router)
-app.include_router(
-    admin.router,
-    prefix="/admin",
-    tags=["admin"],
-    dependencies=[Depends(get_token_header)],
-    responses={418: {"description": "I'm a teapot"}},
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Build the inpainting pipeline before serving requests.
+    engine.load()
+    yield
+
+
+app = FastAPI(title="Satellite Generative Fill", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+app.include_router(api.router)
 
 
 @app.get("/")
 async def root():
-    return {"message": "Hello Bigger Applications!"}
+    return {"status": "ok", "service": "satellite-generative-fill"}

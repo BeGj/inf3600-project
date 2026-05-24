@@ -7,8 +7,9 @@ import WebGLTileLayer from "ol/layer/WebGLTile";
 import GeoTIFF from "ol/source/GeoTIFF";
 import Static from "ol/source/ImageStatic";
 import OSM from "ol/source/OSM";
-import { transformExtent } from "ol/proj";
-import { Draw } from "ol/interaction";
+import { transformExtent, toLonLat, fromLonLat } from "ol/proj";
+import { containsExtent } from "ol/extent";
+import { Draw, Link } from "ol/interaction";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
@@ -27,6 +28,10 @@ interface MapViewProps {
   drawingActive: boolean;
   clearKey: number;
   onMaskDrawn: (geojson: Polygon) => void;
+  /** Called when the user tries to draw outside the loaded image. */
+  onInvalidDraw?: (message: string) => void;
+  /** Called once with the OpenLayers Map instance so the parent can read the view extent. */
+  onMapReady?: (map: Map) => void;
 }
 
 const DRAW_STYLE = {
@@ -35,12 +40,16 @@ const DRAW_STYLE = {
   "fill-color": "rgba(255,68,68,0.15)",
 };
 
-export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onMaskDrawn }: MapViewProps) {
+export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onMaskDrawn, onInvalidDraw, onMapReady }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<Map | null>(null);
   const drawSource = useRef(new VectorSource());
   const drawInteraction = useRef<Draw | null>(null);
   const overlayLayers = useRef<ImageLayer<Static>[]>([]);
+  // Extent of the loaded COG, in the map view projection. Drawing is restricted to it.
+  const cogExtent = useRef<number[] | null>(null);
+  // True once a COG has replaced the view with its own projection/resolutions.
+  const viewIsCog = useRef(false);
 
   // Initialise map once
   useEffect(() => {
@@ -56,10 +65,18 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
     });
     mapInstance.current = map;
 
+    // Sync the view (center x/y, zoom z, rotation r, layers l) to the URL so map state
+    // is shareable/bookmarkable, and restore it on load. Re-binds itself when the view is
+    // replaced (e.g. when a COG with its own projection loads).
+    map.addInteraction(new Link());
+
+    onMapReady?.(map);
+
     return () => {
       map.setTarget(undefined);
       mapInstance.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load COG layer when URL changes
@@ -76,14 +93,47 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
     });
     map.addLayer(cogLayer);
 
-    // Zoom to COG extent
+    // Center/zoom on the COG, but DON'T adopt its `extent` — keeping the extent would
+    // lock panning to the image. We capture the extent separately to restrict drawing.
     (cogLayer.getSource() as GeoTIFF).getView().then((viewOptions) => {
-      map.setView(new View(viewOptions));
+      const opts = viewOptions as typeof viewOptions & { extent?: number[]; resolutions?: number[] };
+      const { extent, resolutions, ...viewRest } = opts;
+      cogExtent.current = extent ?? null;
+
+      // The COG's native resolutions cap zoom-in at the finest overview. Append a few
+      // finer levels so users can zoom past native resolution (imagery oversamples).
+      let res = resolutions;
+      if (res && res.length > 0) {
+        const finest = res[res.length - 1];
+        res = [...res, finest / 2, finest / 4, finest / 8];
+      }
+      map.setView(new View({ ...viewRest, resolutions: res }));
+      viewIsCog.current = true;
     });
 
     return () => {
       map.removeLayer(cogLayer);
+      cogExtent.current = null;
     };
+  }, [cogUrl]);
+
+  // When the scene is cleared, drop the COG's projection/zoom limits by restoring a
+  // default, unconstrained Web Mercator view (kept at the current location).
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map || cogUrl || !viewIsCog.current) return;
+    const old = map.getView();
+    const center = old.getCenter();
+    const lonLat = center ? toLonLat(center, old.getProjection()) : [0, 0];
+    map.setView(
+      new View({
+        center: fromLonLat(lonLat, "EPSG:3857"),
+        zoom: old.getZoom() ?? 2,
+        projection: "EPSG:3857",
+      })
+    );
+    viewIsCog.current = false;
+    cogExtent.current = null;
   }, [cogUrl]);
 
   // Sync result overlays
@@ -95,15 +145,16 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
     overlayLayers.current.forEach((l) => map.removeLayer(l));
     overlayLayers.current = [];
 
+    const viewProj = map.getView().getProjection();
     overlays.forEach(({ image_b64, bbox }) => {
       const [lngMin, latMin, lngMax, latMax] = bbox;
-      const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", "EPSG:3857");
+      const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", viewProj);
       const layer = new ImageLayer({
         source: new Static({
           url: `data:image/png;base64,${image_b64}`,
           imageExtent: extent,
         }),
-        opacity: 0.95,
+        opacity: 1,
         zIndex: 2,
       });
       map.addLayer(layer);
@@ -125,10 +176,23 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
       drawSource.current.clear();
       const interaction = new Draw({ source: drawSource.current, type: "Polygon" });
       interaction.on("drawend", (evt) => {
-        const format = new GeoJSON();
-        const geojson = JSON.parse(format.writeFeature(evt.feature, { featureProjection: "EPSG:3857", dataProjection: "EPSG:4326" })) as { geometry: Polygon };
-        onMaskDrawn(geojson.geometry);
         map.removeInteraction(interaction);
+
+        // Reject polygons that extend beyond the loaded image — painting outside it
+        // has no source imagery to inpaint against.
+        const geomExtent = evt.feature.getGeometry()?.getExtent();
+        if (cogExtent.current && geomExtent && !containsExtent(cogExtent.current, geomExtent)) {
+          drawSource.current.clear();
+          onInvalidDraw?.("Draw inside the loaded image.");
+          return;
+        }
+
+        const format = new GeoJSON();
+        const viewProj = map.getView().getProjection();
+        const geojson = JSON.parse(
+          format.writeFeature(evt.feature, { featureProjection: viewProj, dataProjection: "EPSG:4326" })
+        ) as { geometry: Polygon };
+        onMaskDrawn(geojson.geometry);
       });
       map.addInteraction(interaction);
       drawInteraction.current = interaction;
@@ -138,7 +202,7 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
         drawInteraction.current = null;
       }
     }
-  }, [drawingActive, onMaskDrawn]);
+  }, [drawingActive, onMaskDrawn, onInvalidDraw]);
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
 }
