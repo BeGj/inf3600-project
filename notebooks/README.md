@@ -27,14 +27,26 @@ pre-commit install
 `.gitattributes` also registers `nbstripout` as a git filter for clean diffs; to
 activate that locally run `uv tool install nbstripout && nbstripout --install`.
 
+## Layout
+
+```
+notebooks/
+  prepare/                  data-prep scripts (HF dataset -> image/mask pairs)
+  train_houses_lora.ipynb   active LoRA training notebooks
+  train_trees_lora.ipynb
+  sanity_check_inpaint.ipynb base-model inpaint sanity check
+  exploration/              kept-for-reference experiments (not the active pipeline)
+  outputs/                  trained adapters + sample renders (git-ignored)
+```
+
 ## Dataset preparation
 
 The training notebooks read prepared datasets from `../datasets/`. Generate them
-first with the scripts under `scripts/`:
+first with the scripts under `prepare/`:
 
 ```powershell
-uv run python scripts/prepare_morocco_buildings_lora_dataset.py --output-dir ../datasets/houses
-uv run python scripts/prepare_wroclaw_trees_lora_dataset.py --output-dir ../datasets/trees
+uv run python prepare/prepare_houses.py --output-dir ../datasets/houses
+uv run python prepare/prepare_trees.py  --output-dir ../datasets/trees
 ```
 
 Each script writes images, masks, and a `metadata.jsonl` manifest.
@@ -45,27 +57,33 @@ Each script writes images, masks, and a `metadata.jsonl` manifest.
 
 | Notebook | Purpose |
 | --- | --- |
-| `train_houses_lora.ipynb` | Self-contained LoRA training for `stable-diffusion-v1-5/stable-diffusion-inpainting`. Reads `datasets/houses` and saves website-ready adapter weights to `outputs/lora_houses`. Uses 🤗 `accelerate` and locates the repo root automatically. |
-| `train_trees_lora.ipynb` | Same pipeline as the houses notebook, but trains on `datasets/trees` and writes to `outputs/lora_trees`. |
-| `002_lora_finetune.ipynb` | Earlier LoRA fine-tuning experiment. Fine-tunes SD2 inpainting on the [`arampacha/rsicd`](https://huggingface.co/datasets/arampacha/rsicd) satellite caption dataset, training only ~3 MB of adapter weights. Hyperparameters are collected in a single `CFG` dict. Tested on an RTX 3080 (10 GB), ~1–2 h for 3 epochs. Superseded by the `train_*_lora` notebooks. |
+| `train_houses_lora.ipynb` | Self-contained LoRA training for `stable-diffusion-v1-5/stable-diffusion-inpainting`. Reads `datasets/houses` and saves website-ready adapter weights to `notebooks/outputs/lora_houses`. Uses 🤗 `accelerate` and locates the repo root automatically. |
+| `train_trees_lora.ipynb` | Same pipeline as the houses notebook, but trains on `datasets/trees` and writes to `notebooks/outputs/lora_trees`. |
 
 ### Inference / testing
 
 | Notebook | Purpose |
 | --- | --- |
-| `test_notebook.ipynb` | Minimal sanity check for SD 1.5 inpainting. Deliberately ignores the rest of the repo: loads one image + one mask from a prepared dataset and runs the base `stable-diffusion-v1-5/stable-diffusion-inpainting` model — no LoRA, backend, or crop logic. Useful for confirming an image/mask pair is correct (white pixels are repainted). |
-| `001_sd-inpaint.ipynb` | Interactive Stable Diffusion 3 inpainting playground. Upload an image with an `ipywidgets` uploader, draw a polygon mask on an `ipycanvas` canvas, set prompt / negative prompt, and run the `StableDiffusion3InpaintPipeline`. Saves output to `inpaint_result.png`. |
-| `003_test-inpaint.ipynb` | Empty placeholder (no cells yet). |
-| `qwen-image-edit.ipynb` | Experiment with the `QwenImageEditPipeline` for instruction-based image editing, using 4-bit (bitsandbytes) quantization and an `ipywidgets` upload UI. Not part of the inpainting pipeline; kept for comparison. |
+| `sanity_check_inpaint.ipynb` | Minimal sanity check for SD 1.5 inpainting. Deliberately ignores the rest of the repo: loads one image + one mask from a prepared dataset and runs the base `stable-diffusion-v1-5/stable-diffusion-inpainting` model — no LoRA, backend, or crop logic. Useful for confirming an image/mask pair is correct (white pixels are repainted). |
+
+### Exploration (`exploration/`)
+
+Kept for reference; not part of the active inpainting pipeline.
+
+| Notebook | Purpose |
+| --- | --- |
+| `sd2_lora_finetune.ipynb` | Earlier LoRA fine-tuning experiment. Fine-tunes SD2 inpainting on the [`arampacha/rsicd`](https://huggingface.co/datasets/arampacha/rsicd) satellite caption dataset, training only ~3 MB of adapter weights. Hyperparameters are collected in a single `CFG` dict. Superseded by the `train_*_lora` notebooks. |
+| `explore_sd_inpaint.ipynb` | Interactive Stable Diffusion 3 inpainting playground. Upload an image with an `ipywidgets` uploader, draw a polygon mask on an `ipycanvas` canvas, set prompt / negative prompt, and run the `StableDiffusion3InpaintPipeline`. |
+| `explore_qwen_edit.ipynb` | Experiment with the `QwenImageEditPipeline` for instruction-based image editing, using 4-bit (bitsandbytes) quantization and an `ipywidgets` upload UI. |
 
 ## Conventions
 
 - Masks are binary; **white pixels mark the region the model repaints**.
 - The training notebooks find the repo root by walking up to the directory that
-  contains both `backend/` and `frontend/`, so they can be run from anywhere in
-  the tree.
-- Trained adapters land in `outputs/lora_<name>/` (diffusers layout); peft-format
-  checkpoints under `lora-satellite-inpaint/` work too.
+  contains `backend/`, `frontend/`, and `notebooks/`, so they can be run from
+  anywhere in the tree.
+- Trained adapters land in `notebooks/outputs/lora_<name>/` (diffusers layout);
+  peft-format checkpoints (e.g. `notebooks/outputs/lora-satellite-inpaint/`) work too.
 
 ## Deploying a trained model to the backend
 
@@ -75,7 +93,7 @@ Training only produces the adapter; the backend serves it. Normalise an adapter 
 ```bash
 uv run python ../scripts/export_lora.py \
   --id trees --label "Trees" \
-  --adapter ../outputs/lora_trees \
+  --adapter outputs/lora_trees \
   --prompt "satellite view of trees, canopy cover, urban vegetation" \
   --negative "blurry, distorted, low quality, cartoon, warped perspective, repeated artifacts"
 ```

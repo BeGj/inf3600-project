@@ -20,7 +20,7 @@ The `base` entry needs no weights (runs the SD1.5 inpainting model with no adapt
 ## Exporting a trained adapter
 
 Training notebooks (`notebooks/train_houses_lora.ipynb`, `train_trees_lora.ipynb`) produce
-adapters under `notebooks/lora-satellite-inpaint/` or `outputs/lora_<name>/`. Normalise one
+adapters under `notebooks/outputs/lora_<name>/`. Normalise one
 into this directory and register it with `scripts/export_lora.py` (run from the notebooks
 env, which has torch/diffusers/peft):
 
@@ -28,13 +28,13 @@ env, which has torch/diffusers/peft):
 cd notebooks
 uv run python ../scripts/export_lora.py \
   --id houses --label "Houses" \
-  --adapter lora-satellite-inpaint/lora-final \
+  --adapter outputs/lora_houses \
   --prompt "satellite view of small houses, roof geometry, driveways, residential block" \
   --negative "blurry, distorted, repeated roofs, warped perspective, low quality"
 
 uv run python ../scripts/export_lora.py \
   --id trees --label "Trees" \
-  --adapter ../outputs/lora_trees \
+  --adapter outputs/lora_trees \
   --prompt "satellite view of trees, canopy cover, urban vegetation" \
   --negative "blurry, distorted, low quality, cartoon, warped perspective, repeated artifacts"
 ```

@@ -3,9 +3,9 @@
 
 Training produces adapters in two shapes:
   * peft format    — adapter_model.safetensors + adapter_config.json
-                     (e.g. notebooks/lora-satellite-inpaint/lora-final/)
+                     (e.g. notebooks/outputs/lora-satellite-inpaint/lora-final/)
   * diffusers fmt  — pytorch_lora_weights.safetensors
-                     (e.g. outputs/lora_houses/)
+                     (e.g. notebooks/outputs/lora_houses/)
 
 This script normalises either into the diffusers format the backend loads, writing
     backend/models/<id>/pytorch_lora_weights.safetensors
@@ -14,7 +14,7 @@ and upserting the matching entry in backend/models/registry.json.
 Usage:
     uv run python scripts/export_lora.py \
         --id houses --label "Houses" \
-        --adapter notebooks/lora-satellite-inpaint/lora-final \
+        --adapter notebooks/outputs/lora_houses \
         --prompt "satellite view of small houses, roof geometry, driveways, residential block" \
         --negative "blurry, distorted, repeated roofs, warped perspective, low quality"
 

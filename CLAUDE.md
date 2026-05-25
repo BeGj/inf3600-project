@@ -57,7 +57,7 @@ There is no backend test suite yet. To smoke-check backend modules without a GPU
 - **Mask convention**: white (255) = repaint, black = preserve. Kept binary end-to-end.
 - **Inference params** (`backend/app/inference/pipeline.py`: `RESOLUTION`,
   `NUM_INFERENCE_STEPS`, `GUIDANCE_SCALE`, `STRENGTH`) mirror
-  `notebooks/test_notebook.ipynb` — keep them in sync so prod matches validation.
+  `notebooks/sanity_check_inpaint.ipynb` — keep them in sync so prod matches validation.
 - **Context margin**: `/inpaint` reads a padded area around the polygon (`CONTEXT_MARGIN`
   / `INPAINT_CONTEXT_MARGIN`, default 0.5) so the model blends with real surroundings
   instead of generating a disconnected patch. The result is overlaid at the padded
@@ -79,5 +79,5 @@ There is no backend test suite yet. To smoke-check backend modules without a GPU
 
 ## Git
 
-`main` is the working branch. Generated artifacts (`outputs/`, dataset contents, model
+`main` is the working branch. Generated artifacts (`notebooks/outputs/`, dataset contents, model
 weights, `node_modules/`, `dist/`) are git-ignored — don't commit them.

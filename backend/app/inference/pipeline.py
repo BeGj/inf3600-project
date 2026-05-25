@@ -1,6 +1,6 @@
 """Singleton Stable Diffusion 1.5 inpainting pipeline with swappable LoRA adapters.
 
-Inference parameters are ported verbatim from notebooks/test_notebook.ipynb so the
+Inference parameters are ported verbatim from notebooks/sanity_check_inpaint.ipynb so the
 production result matches what was validated during training:
 
     RESOLUTION = 512, NUM_INFERENCE_STEPS = 40, GUIDANCE_SCALE = 6.5, STRENGTH = 1.0

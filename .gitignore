@@ -2,6 +2,9 @@
 **/.venv/
 **/__pycache__/
 .env
+
+# Training outputs (trained adapters, checkpoints, sample renders — all regenerable).
+# Bare pattern: matches a dir named `outputs/` at any depth (notebooks/outputs/, etc.).
 outputs/
 
 # Node
@@ -11,11 +14,6 @@ frontend/dist/
 # Model weights (large; ship via volume/release). Keep the manifest + README.
 backend/models/**/*.safetensors
 backend/models/**/*.bin
-
-# Notebook training outputs (peft checkpoints + sample renders are regenerable).
-notebooks/lora-satellite-inpaint/
-notebooks/inpaint_result.png
-
 # Datasets (keep structure, ignore contents)
 datasets/*
 !datasets/houses/

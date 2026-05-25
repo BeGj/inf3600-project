@@ -44,13 +44,13 @@ cd notebooks
 uv sync
 uv run python ../scripts/export_lora.py \
   --id houses --label "Houses" \
-  --adapter lora-satellite-inpaint/lora-final \
+  --adapter outputs/lora_houses \
   --prompt "satellite view of small houses, roof geometry, driveways, residential block" \
   --negative "blurry, distorted, repeated roofs, warped perspective, low quality"
 
 uv run python ../scripts/export_lora.py \
   --id trees --label "Trees" \
-  --adapter ../outputs/lora_trees \
+  --adapter outputs/lora_trees \
   --prompt "satellite view of trees, canopy cover, urban vegetation" \
   --negative "blurry, distorted, low quality, cartoon, warped perspective, repeated artifacts"
 ```
@@ -139,7 +139,7 @@ Common extensions:
   compositing step before `geo.read_patch` returns RGB.
 - **Tune inference** — generation params live as constants in
   `backend/app/inference/pipeline.py` (`RESOLUTION`, `NUM_INFERENCE_STEPS`,
-  `GUIDANCE_SCALE`, `STRENGTH`). They mirror `notebooks/test_notebook.ipynb`; keep the two
+  `GUIDANCE_SCALE`, `STRENGTH`). They mirror `notebooks/sanity_check_inpaint.ipynb`; keep the two
   in sync so prod matches what you validate while training.
 - **Heavier scale** — inference is **synchronous, in-process, and lock-serialized** (one
   request at a time), which is fine for a demo/single user. To support concurrency, move
@@ -154,4 +154,4 @@ Common extensions:
 ## Datasets & training
 
 Dataset prep and LoRA training live in `notebooks/` — see [`notebooks/README.md`](notebooks/README.md).
-Generated images, masks, dataset files, model weights, and `outputs/` are git-ignored.
+Generated images, masks, dataset files, model weights, and `notebooks/outputs/` are git-ignored.
