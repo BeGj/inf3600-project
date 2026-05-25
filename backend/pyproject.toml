@@ -1,9 +1,31 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "Satellite generative-fill backend"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi[standard]>=0.135.3",
+    "accelerate>=1.13.0",
+    "diffusers>=0.37.1",
+    "numpy>=1.26",
+    "peft>=0.19.1",
+    "pillow>=12.2.0",
+    "pystac-client>=0.8.3",
+    "rasterio>=1.4.0",
+    "safetensors>=0.4.5",
+    "shapely>=2.0.6",
+    "torch>=2.11.0",
+    "transformers>=5.5.3",
 ]
+
+[tool.uv.sources]
+diffusers = { git = "https://github.com/huggingface/diffusers" }
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

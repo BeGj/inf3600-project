@@ -2,12 +2,18 @@
 **/.venv/
 **/__pycache__/
 .env
+
+# Training outputs (trained adapters, checkpoints, sample renders — all regenerable).
+# Bare pattern: matches a dir named `outputs/` at any depth (notebooks/outputs/, etc.).
 outputs/
 
 # Node
 **/node_modules/
 frontend/dist/
 
+# Model weights (large; ship via volume/release). Keep the manifest + README.
+backend/models/**/*.safetensors
+backend/models/**/*.bin
 # Datasets (keep structure, ignore contents)
 datasets/*
 !datasets/houses/

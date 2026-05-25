@@ -21,6 +21,14 @@ html, body, #root {
   overflow: hidden;
 }
 
+.side-panel {
+  width: 320px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  background: #1a1a1a;
+}
+
 .map-container {
   flex: 1;
   position: relative;

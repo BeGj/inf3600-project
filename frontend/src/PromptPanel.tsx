@@ -1,12 +1,11 @@
-import { useState } from "react";
-
-export type Mode = "sdxl" | "prithvi";
+import { useEffect, useState } from "react";
+import type { ModelInfo } from "./api";
 
 interface PromptPanelProps {
-  mode: Mode;
-  onModeChange: (m: Mode) => void;
-  cogUrl: string;
-  onCogUrlChange: (url: string) => void;
+  models: ModelInfo[];
+  modelId: string;
+  onModelChange: (id: string) => void;
+  sceneReady: boolean;
   drawingActive: boolean;
   maskReady: boolean;
   onStartDraw: () => void;
@@ -16,11 +15,22 @@ interface PromptPanelProps {
   error: string | null;
 }
 
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  marginTop: 4,
+  padding: "0.4rem",
+  background: "#333",
+  color: "#eee",
+  border: "1px solid #555",
+  borderRadius: 4,
+  boxSizing: "border-box",
+};
+
 export default function PromptPanel({
-  mode,
-  onModeChange,
-  cogUrl,
-  onCogUrlChange,
+  models,
+  modelId,
+  onModelChange,
+  sceneReady,
   drawingActive,
   maskReady,
   onStartDraw,
@@ -29,50 +39,38 @@ export default function PromptPanel({
   loading,
   error,
 }: PromptPanelProps) {
-  const [prompt, setPrompt] = useState("clear blue ocean");
+  const [prompt, setPrompt] = useState("");
+
+  // When the selected model changes, seed the prompt with its default (unless the
+  // user has already typed something).
+  const selected = models.find((m) => m.id === modelId);
+  useEffect(() => {
+    if (selected && prompt.trim() === "") setPrompt(selected.default_prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelId]);
 
   return (
-    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", background: "#1a1a1a", color: "#eee", width: 300, boxSizing: "border-box" }}>
-      <h2 style={{ margin: 0, fontSize: "1rem" }}>Satellite Generative Fill</h2>
+    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", color: "#eee" }}>
+      <h2 style={{ margin: 0, fontSize: "1rem" }}>Generative Fill</h2>
 
-      {/* Mode toggle */}
-      <div style={{ display: "flex", gap: "0.5rem" }}>
-        {(["sdxl", "prithvi"] as Mode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => onModeChange(m)}
-            style={{
-              flex: 1,
-              padding: "0.4rem",
-              background: mode === m ? "#4a9eff" : "#333",
-              color: "#fff",
-              border: "none",
-              borderRadius: 4,
-              cursor: "pointer",
-              fontWeight: mode === m ? "bold" : "normal",
-            }}
-          >
-            {m === "sdxl" ? "Generative Fill (SDXL)" : "Cloud Remove (Prithvi)"}
-          </button>
-        ))}
-      </div>
-
-      {/* COG URL input */}
+      {/* Model selector — driven by GET /models */}
       <label style={{ fontSize: "0.8rem" }}>
-        COG URL
-        <input
-          value={cogUrl}
-          onChange={(e) => onCogUrlChange(e.target.value)}
-          placeholder="https://example.com/image.tif"
-          style={{ width: "100%", marginTop: 4, padding: "0.4rem", background: "#333", color: "#eee", border: "1px solid #555", borderRadius: 4, boxSizing: "border-box" }}
-        />
+        Model
+        <select value={modelId} onChange={(e) => onModelChange(e.target.value)} style={inputStyle}>
+          {models.length === 0 && <option value="">Loading…</option>}
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
       </label>
 
       {/* Mask controls */}
       <div style={{ display: "flex", gap: "0.5rem" }}>
         <button
           onClick={onStartDraw}
-          disabled={drawingActive || loading}
+          disabled={drawingActive || loading || !sceneReady}
           style={{ flex: 1, padding: "0.4rem", background: drawingActive ? "#555" : "#2a6", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer" }}
         >
           {drawingActive ? "Drawing…" : "Draw Mask"}
@@ -86,23 +84,19 @@ export default function PromptPanel({
         </button>
       </div>
 
-      {/* Prompt (SDXL only) */}
-      {mode === "sdxl" && (
-        <label style={{ fontSize: "0.8rem" }}>
-          Prompt
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={3}
-            style={{ width: "100%", marginTop: 4, padding: "0.4rem", background: "#333", color: "#eee", border: "1px solid #555", borderRadius: 4, resize: "vertical", boxSizing: "border-box" }}
-          />
-        </label>
-      )}
+      <label style={{ fontSize: "0.8rem" }}>
+        Prompt
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          rows={3}
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+      </label>
 
-      {/* Generate button */}
       <button
         onClick={() => onGenerate(prompt)}
-        disabled={loading || !cogUrl || (mode === "sdxl" && (!maskReady || !prompt.trim()))}
+        disabled={loading || !sceneReady || !maskReady || !prompt.trim() || !modelId}
         style={{
           padding: "0.6rem",
           background: loading ? "#555" : "#4a9eff",
@@ -117,8 +111,8 @@ export default function PromptPanel({
         {loading ? "Generating…" : "Generate"}
       </button>
 
-      {/* Status / error */}
-      {maskReady && !loading && <p style={{ margin: 0, fontSize: "0.75rem", color: "#8f8" }}>Mask ready.</p>}
+      {!sceneReady && <p style={{ margin: 0, fontSize: "0.75rem", color: "#aaa" }}>Search and select a scene first.</p>}
+      {sceneReady && maskReady && !loading && <p style={{ margin: 0, fontSize: "0.75rem", color: "#8f8" }}>Mask ready.</p>}
       {error && <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>}
     </div>
   );

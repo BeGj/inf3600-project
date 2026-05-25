@@ -5,6 +5,11 @@ from pathlib import Path
 
 from datasets import load_dataset
 from PIL import Image, ImageDraw
+from tqdm import tqdm
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "datasets" / "trees"
 
 
 def parse_args():
@@ -18,7 +23,7 @@ def parse_args():
     )
     parser.add_argument("--split", type=str, default="train")
     parser.add_argument("--subset", type=str, default=None)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--image-column", type=str, default="images")
     parser.add_argument("--metadata-column", type=str, default="metadata")
     parser.add_argument("--prompt", type=str, default="satellite view of trees, canopy cover, urban vegetation")
@@ -56,8 +61,9 @@ def main():
     metadata_path = args.output_dir / "metadata.jsonl"
     count = 0
 
+    total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(dataset):
+        for index, row in enumerate(tqdm(dataset, total=total, desc="Building tree pairs")):
             image = row[args.image_column]
             metadata = row[args.metadata_column]
 
