@@ -7,7 +7,7 @@ import type { ResultOverlay } from "./MapView";
 import PromptPanel from "./PromptPanel";
 import CatalogPanel from "./CatalogPanel";
 import { getModels, inpaint } from "./api";
-import type { BBox, ModelInfo, Scene } from "./api";
+import type { BBox, InpaintOptions, ModelInfo, Scene } from "./api";
 import "./App.css";
 
 export default function App() {
@@ -91,13 +91,13 @@ export default function App() {
   }, []);
 
   const handleGenerate = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, opts: InpaintOptions) => {
       if (!scene || !mask || !modelId) return;
       setError(null);
       setLoading(true);
       try {
         const bbox = bboxFromMask(mask);
-        const result = await inpaint(bbox, mask, prompt, scene.visual_href, modelId);
+        const result = await inpaint(bbox, mask, prompt, scene.visual_href, modelId, opts);
         setOverlays((prev) => [...prev, { image_b64: result.image_b64, bbox: result.bbox }]);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));

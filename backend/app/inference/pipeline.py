@@ -89,6 +89,10 @@ class InpaintEngine:
         mask: Image.Image,
         prompt: str,
         seed: int | None = None,
+        negative_prompt: str | None = None,
+        guidance_scale: float | None = None,
+        strength: float | None = None,
+        num_inference_steps: int | None = None,
     ) -> Image.Image:
         if self._pipe is None:
             raise RuntimeError("Pipeline not loaded. Did startup run?")
@@ -101,7 +105,7 @@ class InpaintEngine:
         if float((np.asarray(mask) > 0).mean()) == 0:
             raise ValueError("Mask is empty after rasterization; nothing to inpaint.")
 
-        negative_prompt = entry.negative_prompt or None
+        negative_prompt = negative_prompt or entry.negative_prompt or None
         run_seed = seed if seed is not None else int.from_bytes(os.urandom(4), "big") % 2_147_483_647
 
         with self._lock:
@@ -114,9 +118,11 @@ class InpaintEngine:
                 mask_image=mask,
                 height=RESOLUTION,
                 width=RESOLUTION,
-                strength=STRENGTH,
-                num_inference_steps=NUM_INFERENCE_STEPS,
-                guidance_scale=GUIDANCE_SCALE,
+                strength=strength if strength is not None else STRENGTH,
+                num_inference_steps=(
+                    num_inference_steps if num_inference_steps is not None else NUM_INFERENCE_STEPS
+                ),
+                guidance_scale=guidance_scale if guidance_scale is not None else GUIDANCE_SCALE,
                 generator=generator,
             ).images[0]
         return result

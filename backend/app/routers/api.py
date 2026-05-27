@@ -89,6 +89,10 @@ class InpaintRequest(BaseModel):
     prompt: str
     model_id: str
     seed: int | None = None
+    negative_prompt: str | None = None
+    guidance_scale: float | None = Field(default=None, ge=0, le=30)
+    strength: float | None = Field(default=None, ge=0, le=1)
+    num_inference_steps: int | None = Field(default=None, ge=1, le=150)
 
 
 class InpaintResponse(BaseModel):
@@ -115,7 +119,17 @@ def inpaint(req: InpaintRequest) -> InpaintResponse:
         raise HTTPException(status_code=400, detail=f"Failed to read imagery/mask: {exc}") from exc
 
     try:
-        result = engine.infer(entry, image, mask, req.prompt, seed=req.seed)
+        result = engine.infer(
+            entry,
+            image,
+            mask,
+            req.prompt,
+            seed=req.seed,
+            negative_prompt=req.negative_prompt,
+            guidance_scale=req.guidance_scale,
+            strength=req.strength,
+            num_inference_steps=req.num_inference_steps,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

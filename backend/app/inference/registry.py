@@ -50,6 +50,7 @@ class ModelEntry:
             "label": self.label,
             "type": self.type,
             "default_prompt": self.default_prompt,
+            "negative_prompt": self.negative_prompt,
         }
 
 

@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import type { ModelInfo } from "./api";
+import type { InpaintOptions, ModelInfo } from "./api";
+
+// Backend defaults (backend/app/inference/pipeline.py) — kept in sync so the sliders
+// start where the model would run if left untouched.
+const DEFAULT_GUIDANCE_SCALE = 6.5;
+const DEFAULT_STRENGTH = 1.0;
+const DEFAULT_NUM_INFERENCE_STEPS = 40;
 
 interface PromptPanelProps {
   models: ModelInfo[];
@@ -10,7 +16,7 @@ interface PromptPanelProps {
   maskReady: boolean;
   onStartDraw: () => void;
   onClearMask: () => void;
-  onGenerate: (prompt: string) => void;
+  onGenerate: (prompt: string, opts: InpaintOptions) => void;
   loading: boolean;
   error: string | null;
 }
@@ -40,12 +46,18 @@ export default function PromptPanel({
   error,
 }: PromptPanelProps) {
   const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [guidanceScale, setGuidanceScale] = useState(DEFAULT_GUIDANCE_SCALE);
+  const [strength, setStrength] = useState(DEFAULT_STRENGTH);
+  const [numInferenceSteps, setNumInferenceSteps] = useState(DEFAULT_NUM_INFERENCE_STEPS);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // When the selected model changes, seed the prompt with its default (unless the
-  // user has already typed something).
+  // When the selected model changes, seed the prompt + negative prompt with its
+  // defaults (unless the user has already typed something).
   const selected = models.find((m) => m.id === modelId);
   useEffect(() => {
     if (selected && prompt.trim() === "") setPrompt(selected.default_prompt);
+    if (selected && negativePrompt.trim() === "") setNegativePrompt(selected.negative_prompt);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId]);
 
@@ -94,8 +106,82 @@ export default function PromptPanel({
         />
       </label>
 
+      <label style={{ fontSize: "0.8rem" }}>
+        Negative prompt
+        <textarea
+          value={negativePrompt}
+          onChange={(e) => setNegativePrompt(e.target.value)}
+          rows={2}
+          placeholder="Things to avoid in the result"
+          style={{ ...inputStyle, resize: "vertical" }}
+        />
+      </label>
+
+      {/* Advanced inference options */}
       <button
-        onClick={() => onGenerate(prompt)}
+        onClick={() => setShowAdvanced((v) => !v)}
+        style={{
+          alignSelf: "flex-start",
+          padding: 0,
+          background: "none",
+          border: "none",
+          color: "#4a9eff",
+          cursor: "pointer",
+          fontSize: "0.75rem",
+        }}
+      >
+        {showAdvanced ? "▾ Advanced options" : "▸ Advanced options"}
+      </button>
+      {showAdvanced && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <label style={{ fontSize: "0.75rem" }}>
+            Guidance scale (prompt adherence): {guidanceScale}
+            <input
+              type="range"
+              min={1}
+              max={20}
+              step={0.5}
+              value={guidanceScale}
+              onChange={(e) => setGuidanceScale(Number(e.target.value))}
+              style={{ width: "100%" }}
+            />
+          </label>
+          <label style={{ fontSize: "0.75rem" }}>
+            Strength (how much to alter the region): {strength}
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={strength}
+              onChange={(e) => setStrength(Number(e.target.value))}
+              style={{ width: "100%" }}
+            />
+          </label>
+          <label style={{ fontSize: "0.75rem" }}>
+            Inference steps: {numInferenceSteps}
+            <input
+              type="range"
+              min={10}
+              max={80}
+              step={1}
+              value={numInferenceSteps}
+              onChange={(e) => setNumInferenceSteps(Number(e.target.value))}
+              style={{ width: "100%" }}
+            />
+          </label>
+        </div>
+      )}
+
+      <button
+        onClick={() =>
+          onGenerate(prompt, {
+            negativePrompt,
+            guidanceScale,
+            strength,
+            numInferenceSteps,
+          })
+        }
         disabled={loading || !sceneReady || !maskReady || !prompt.trim() || !modelId}
         style={{
           padding: "0.6rem",

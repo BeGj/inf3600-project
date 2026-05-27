@@ -14,6 +14,7 @@ export interface ModelInfo {
   label: string;
   type: "base" | "lora";
   default_prompt: string;
+  negative_prompt: string;
 }
 
 export interface Scene {
@@ -97,23 +98,37 @@ export async function searchCatalog(params: CatalogSearchParams): Promise<Scene[
   return res.json();
 }
 
+export interface InpaintOptions {
+  negativePrompt?: string;
+  guidanceScale?: number;
+  strength?: number;
+  numInferenceSteps?: number;
+}
+
 export async function inpaint(
   bbox: BBox,
   maskGeojson: Polygon,
   prompt: string,
   imageUrl: string,
-  modelId: string
+  modelId: string,
+  opts: InpaintOptions = {}
 ): Promise<InpaintResult> {
+  const body: Record<string, unknown> = {
+    bbox: bboxToArray(bbox),
+    mask_geojson: maskGeojson,
+    prompt,
+    image_url: imageUrl,
+    model_id: modelId,
+  };
+  if (opts.negativePrompt !== undefined) body.negative_prompt = opts.negativePrompt;
+  if (opts.guidanceScale !== undefined) body.guidance_scale = opts.guidanceScale;
+  if (opts.strength !== undefined) body.strength = opts.strength;
+  if (opts.numInferenceSteps !== undefined) body.num_inference_steps = opts.numInferenceSteps;
+
   const res = await fetch(`${BASE_URL}/inpaint`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bbox: bboxToArray(bbox),
-      mask_geojson: maskGeojson,
-      prompt,
-      image_url: imageUrl,
-      model_id: modelId,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const detail = await res.text();
