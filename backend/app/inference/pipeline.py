@@ -57,8 +57,13 @@ def flux_available() -> tuple[bool, str | None]:
     if total < FLUX_MIN_VRAM_BYTES:
         gb = total / 1024**3
         return False, f"FLUX (auto-disabled: GPU has {gb:.0f}GB VRAM, requires 24GB+)"
-    if not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")):
-        return False, "FLUX (auto-disabled: set HF_TOKEN and accept the FLUX.1-Fill-dev license)"
+    try:
+        from huggingface_hub import get_token as _get_hf_token
+        _hf_token = _get_hf_token()
+    except Exception:
+        _hf_token = None
+    if not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or _hf_token):
+        return False, "FLUX (auto-disabled: set HF_TOKEN or run 'huggingface-cli login', and accept the FLUX.1-Fill-dev license)"
     return True, None
 
 
