@@ -20,6 +20,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clearKey, setClearKey] = useState(0);
+  const [hoverBBox, setHoverBBox] = useState<[number, number, number, number] | null>(null);
   const mapRef = useRef<Map | null>(null);
 
   // Load available models once.
@@ -64,6 +65,10 @@ export default function App() {
     setMask(null);
     setError(null);
     setClearKey((k) => k + 1);
+  }, []);
+
+  const handleHoverScene = useCallback((s: Scene | null) => {
+    setHoverBBox(s ? s.bbox : null);
   }, []);
 
   const handleClearScene = useCallback(() => {
@@ -120,7 +125,7 @@ export default function App() {
   return (
     <div className="app-root">
       <div className="side-panel">
-        <CatalogPanel getViewBBox={getViewBBox} selectedSceneId={scene?.id ?? null} onSelectScene={handleSelectScene} onClearScene={handleClearScene} onFitResults={fitToResults} />
+        <CatalogPanel getViewBBox={getViewBBox} selectedSceneId={scene?.id ?? null} onSelectScene={handleSelectScene} onHoverScene={handleHoverScene} onClearScene={handleClearScene} onFitResults={fitToResults} />
         <PromptPanel
           models={models}
           modelId={modelId}
@@ -141,6 +146,7 @@ export default function App() {
           overlays={overlays}
           drawingActive={drawingActive}
           clearKey={clearKey}
+          highlightBBox={hoverBBox}
           onMaskDrawn={handleMaskDrawn}
           onInvalidDraw={handleInvalidDraw}
           onMapReady={(map) => { mapRef.current = map; }}

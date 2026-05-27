@@ -7,6 +7,8 @@ interface CatalogPanelProps {
   getViewBBox: () => BBox | null;
   selectedSceneId: string | null;
   onSelectScene: (scene: Scene) => void;
+  /** Preview a result's footprint on the map while hovering it (null on mouse-out). */
+  onHoverScene: (scene: Scene | null) => void;
   onClearScene: () => void;
   /** Fit the map to these scenes (used for event catalogues whose coverage is elsewhere). */
   onFitResults: (scenes: Scene[]) => void;
@@ -33,7 +35,7 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectScene, onClearScene, onFitResults }: CatalogPanelProps) {
+export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectScene, onHoverScene, onClearScene, onFitResults }: CatalogPanelProps) {
   const initialRange = defaultDateRange();
   const [catalogs, setCatalogs] = useState<CatalogInfo[]>([]);
   const [catalogId, setCatalogId] = useState("");
@@ -186,6 +188,8 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
               <button
                 key={scene.id}
                 onClick={() => onSelectScene(scene)}
+                onMouseEnter={() => onHoverScene(scene)}
+                onMouseLeave={() => onHoverScene(null)}
                 style={{
                   display: "flex",
                   gap: "0.5rem",

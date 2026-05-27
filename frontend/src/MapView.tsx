@@ -8,10 +8,12 @@ import GeoTIFF from "ol/source/GeoTIFF";
 import Static from "ol/source/ImageStatic";
 import OSM from "ol/source/OSM";
 import { transformExtent, toLonLat, fromLonLat } from "ol/proj";
-import { containsExtent } from "ol/extent";
+import { containsExtent, intersects } from "ol/extent";
 import { Draw, Link } from "ol/interaction";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
+import Feature from "ol/Feature";
+import { fromExtent as polygonFromExtent } from "ol/geom/Polygon";
 import GeoJSON from "ol/format/GeoJSON";
 import type { Polygon } from "geojson";
 import "ol/ol.css";
@@ -27,6 +29,8 @@ interface MapViewProps {
   overlays: ResultOverlay[];
   drawingActive: boolean;
   clearKey: number;
+  /** Footprint to preview on the map (hovered search result), WGS-84, or null. */
+  highlightBBox: [number, number, number, number] | null;
   onMaskDrawn: (geojson: Polygon) => void;
   /** Called when the user tries to draw outside the loaded image. */
   onInvalidDraw?: (message: string) => void;
@@ -40,10 +44,18 @@ const DRAW_STYLE = {
   "fill-color": "rgba(255,68,68,0.15)",
 };
 
-export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onMaskDrawn, onInvalidDraw, onMapReady }: MapViewProps) {
+const HIGHLIGHT_STYLE = {
+  "stroke-color": "#4a9eff",
+  "stroke-width": 2,
+  "stroke-line-dash": [6, 4],
+  "fill-color": "rgba(74,158,255,0.08)",
+};
+
+export default function MapView({ cogUrl, overlays, drawingActive, clearKey, highlightBBox, onMaskDrawn, onInvalidDraw, onMapReady }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<Map | null>(null);
   const drawSource = useRef(new VectorSource());
+  const highlightSource = useRef(new VectorSource());
   const drawInteraction = useRef<Draw | null>(null);
   const overlayLayers = useRef<ImageLayer<Static>[]>([]);
   // Extent of the loaded COG, in the map view projection. Drawing is restricted to it.
@@ -59,6 +71,7 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
       target: mapRef.current,
       layers: [
         new TileLayer({ source: new OSM(), zIndex: 0 }),
+        new VectorLayer({ source: highlightSource.current, style: HIGHLIGHT_STYLE, zIndex: 5 }),
         new VectorLayer({ source: drawSource.current, style: DRAW_STYLE, zIndex: 10 }),
       ],
       view: new View({ center: [0, 0], zoom: 2, projection: "EPSG:3857" }),
@@ -93,10 +106,10 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
     });
     map.addLayer(cogLayer);
 
-    // Center/zoom on the COG, but DON'T adopt its `extent` — keeping the extent would
-    // lock panning to the image. We capture the extent separately to restrict drawing.
+    // Don't adopt the COG's `extent` — keeping the extent would lock panning to the image.
+    // We capture the extent separately to restrict drawing.
     (cogLayer.getSource() as GeoTIFF).getView().then((viewOptions) => {
-      const opts = viewOptions as typeof viewOptions & { extent?: number[]; resolutions?: number[] };
+      const opts = viewOptions as typeof viewOptions & { extent?: number[]; resolutions?: number[]; projection?: unknown };
       const { extent, resolutions, ...viewRest } = opts;
       cogExtent.current = extent ?? null;
 
@@ -107,8 +120,27 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
         const finest = res[res.length - 1];
         res = [...res, finest / 2, finest / 4, finest / 8];
       }
-      map.setView(new View({ ...viewRest, resolutions: res }));
+
+      // Decide whether to keep the user's current view: only move the map if the selected
+      // image is outside the current view. Compare both extents in WGS-84.
+      const oldView = map.getView();
+      const curExtent4326 = transformExtent(oldView.calculateExtent(map.getSize()), oldView.getProjection(), "EPSG:4326");
+      const newProj = (viewRest as { projection?: Parameters<typeof transformExtent>[2] }).projection;
+      const cogExtent4326 = extent && newProj ? transformExtent(extent, newProj, "EPSG:4326") : null;
+      const overlaps = cogExtent4326 ? intersects(curExtent4326, cogExtent4326) : false;
+
+      const newView = new View({ ...viewRest, resolutions: res });
+      map.setView(newView);
       viewIsCog.current = true;
+
+      if (overlaps && newProj) {
+        // Image is in view — reproduce the user's current area in the new projection so the
+        // map doesn't jump or zoom out.
+        newView.fit(transformExtent(curExtent4326, "EPSG:4326", newProj), { duration: 0 });
+      } else if (extent) {
+        // Image is elsewhere — guide the user to it.
+        newView.fit(extent, { duration: 600, padding: [40, 40, 40, 40] });
+      }
     });
 
     return () => {
@@ -161,6 +193,16 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, onM
       overlayLayers.current.push(layer);
     });
   }, [overlays]);
+
+  // Preview the hovered search result's footprint (no map movement on hover).
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    highlightSource.current.clear();
+    if (!highlightBBox) return;
+    const extent = transformExtent(highlightBBox, "EPSG:4326", map.getView().getProjection());
+    highlightSource.current.addFeature(new Feature(polygonFromExtent(extent)));
+  }, [highlightBBox]);
 
   // Clear drawn polygon when clearKey increments
   useEffect(() => {
