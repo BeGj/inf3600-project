@@ -12,6 +12,15 @@ const DEFAULT_NUM_INFERENCE_STEPS = 40;
 const FLUX_GUIDANCE_SCALE = 30;
 const FLUX_NUM_INFERENCE_STEPS = 50;
 
+export interface RestoreSnapshot {
+  key: number;
+  prompt: string;
+  negativePrompt: string;
+  guidanceScale: number;
+  strength: number;
+  numInferenceSteps: number;
+}
+
 interface PromptPanelProps {
   models: ModelInfo[];
   modelId: string;
@@ -25,6 +34,7 @@ interface PromptPanelProps {
   loading: boolean;
   statusMessage: string | null;
   error: string | null;
+  restoreSnapshot?: RestoreSnapshot | null;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -51,6 +61,7 @@ export default function PromptPanel({
   loading,
   statusMessage,
   error,
+  restoreSnapshot,
 }: PromptPanelProps) {
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
@@ -58,6 +69,16 @@ export default function PromptPanel({
   const [strength, setStrength] = useState(DEFAULT_STRENGTH);
   const [numInferenceSteps, setNumInferenceSteps] = useState(DEFAULT_NUM_INFERENCE_STEPS);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (!restoreSnapshot) return;
+    setPrompt(restoreSnapshot.prompt);
+    setNegativePrompt(restoreSnapshot.negativePrompt);
+    setGuidanceScale(restoreSnapshot.guidanceScale);
+    setStrength(restoreSnapshot.strength);
+    setNumInferenceSteps(restoreSnapshot.numInferenceSteps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreSnapshot?.key]);
 
   // When the selected model changes, seed the prompt + negative prompt with its
   // defaults (unless the user has already typed something), and reset the inference
