@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import os
 import threading
+from collections.abc import Callable
+from functools import lru_cache
 
 import numpy as np
 import torch
@@ -30,13 +32,50 @@ NUM_INFERENCE_STEPS = 40
 GUIDANCE_SCALE = 6.5
 STRENGTH = 1.0
 
-# Set HF_INPAINT_LOCAL_ONLY=0 for the very first run (downloads the ~2GB base model).
+# FLUX.1-Fill-dev defaults. FLUX is guidance-distilled: no classical CFG (negative_prompt
+# is ignored) and the embedded guidance runs much higher than SD1.5. FluxFillPipeline does
+# not use `strength`. FLUX is ~12B params / ~24GB fp16, so it only runs on a big GPU.
+FLUX_GUIDANCE_SCALE = 30.0
+FLUX_NUM_INFERENCE_STEPS = 50
+FLUX_MIN_VRAM_BYTES = 22 * 1024**3
+
+# Set HF_INPAINT_LOCAL_ONLY=0 for the very first run (downloads the ~2GB base model, or
+# ~24GB for FLUX). FLUX.1-Fill-dev is a gated repo: accept its license and set HF_TOKEN.
 LOCAL_FILES_ONLY = os.environ.get("HF_INPAINT_LOCAL_ONLY", "1") == "1"
+
+
+@lru_cache(maxsize=1)
+def flux_available() -> tuple[bool, str | None]:
+    """Whether the backend hardware/credentials can run FLUX.1-Fill-dev.
+
+    Returns (True, None) when runnable, else (False, human-readable reason). The frontend
+    uses the reason to grey out the FLUX option; the /inpaint handler uses it to reject a
+    FLUX request defensively. Cached: hardware/env don't change within a process.
+
+    TODO: lru_cache means a token added after startup (e.g. via 'huggingface-cli login')
+          won't be picked up until the process restarts. Acceptable for a demo; call
+          flux_available.cache_clear() if runtime credential refresh is ever needed.
+    """
+    if not torch.cuda.is_available():
+        return False, "FLUX (auto-disabled: backend has no CUDA GPU, requires 24GB+ VRAM)"
+    total = torch.cuda.get_device_properties(0).total_memory
+    if total < FLUX_MIN_VRAM_BYTES:
+        gb = total / 1024**3
+        return False, f"FLUX (auto-disabled: GPU has {gb:.0f}GB VRAM, requires 24GB+)"
+    try:
+        from huggingface_hub import get_token as _get_hf_token
+        _hf_token = _get_hf_token()
+    except Exception:
+        _hf_token = None
+    if not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or _hf_token):
+        return False, "FLUX (auto-disabled: set HF_TOKEN or run 'huggingface-cli login', and accept the FLUX.1-Fill-dev license)"
+    return True, None
 
 
 class InpaintEngine:
     def __init__(self) -> None:
         self._pipe: StableDiffusionInpaintPipeline | None = None
+        self._flux_pipe = None  # FluxFillPipeline, lazy-loaded on first FLUX request
         self._loaded_adapters: set[str] = set()
         self._lock = threading.Lock()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -82,6 +121,44 @@ class InpaintEngine:
             except Exception:
                 pass
 
+    def _ensure_flux(self, on_loaded: Callable[[], None] | None = None) -> None:
+        """Lazy-load FLUX.1-Fill-dev on first use. Caller must hold self._lock.
+
+        Loaded on demand (not at startup) so the ~24GB model isn't resident unless someone
+        actually picks FLUX, and so boot stays fast for the common SD1.5 path.
+
+        on_loaded fires exactly once after the model is ready — either immediately (already
+        cached) or right after from_pretrained() returns. It fires while the lock is held,
+        which is safe because it only updates a Job's status field.
+
+        TODO: self._lock is held for the full duration of from_pretrained() (potentially
+              hours on a cold cache). This blocks concurrent SD1.5 requests for that entire
+              window. The executor's max_workers=1 means there can't be a concurrent request
+              anyway, but if concurrency is ever increased this will need a separate FLUX lock.
+        """
+        if self._flux_pipe is not None:
+            if on_loaded:
+                on_loaded()
+            return
+        ok, reason = flux_available()
+        if not ok:
+            raise RuntimeError(reason or "FLUX is unavailable on this backend.")
+        from diffusers import FluxFillPipeline
+
+        entry = next((e for e in list_models() if e.family == "flux-fill"), None)
+        model_id = (entry.model_id if entry else None) or "black-forest-labs/FLUX.1-Fill-dev"
+        print(f"[inpaint] loading FLUX pipeline '{model_id}' (first request, this is slow)…")
+        pipe = FluxFillPipeline.from_pretrained(
+            model_id,
+            torch_dtype=torch.bfloat16,
+            local_files_only=LOCAL_FILES_ONLY,
+        )
+        pipe.enable_model_cpu_offload()
+        self._flux_pipe = pipe
+        print("[inpaint] FLUX pipeline ready")
+        if on_loaded:
+            on_loaded()
+
     def infer(
         self,
         entry: ModelEntry,
@@ -93,10 +170,8 @@ class InpaintEngine:
         guidance_scale: float | None = None,
         strength: float | None = None,
         num_inference_steps: int | None = None,
+        on_flux_loaded: Callable[[], None] | None = None,
     ) -> Image.Image:
-        if self._pipe is None:
-            raise RuntimeError("Pipeline not loaded. Did startup run?")
-
         image = image.convert("RGB").resize((RESOLUTION, RESOLUTION), Image.Resampling.BILINEAR)
         mask = mask.convert("L").resize((RESOLUTION, RESOLUTION), Image.Resampling.NEAREST)
         # Force a hard binary mask (white repaints) like the notebook does.
@@ -105,8 +180,37 @@ class InpaintEngine:
         if float((np.asarray(mask) > 0).mean()) == 0:
             raise ValueError("Mask is empty after rasterization; nothing to inpaint.")
 
-        negative_prompt = negative_prompt or entry.negative_prompt or None
         run_seed = seed if seed is not None else int.from_bytes(os.urandom(4), "big") % 2_147_483_647
+
+        if entry.family == "flux-fill":
+            with self._lock:
+                self._ensure_flux(on_loaded=on_flux_loaded)
+                # FLUX runs on CUDA (gated by flux_available); generator on the GPU.
+                generator = torch.Generator("cuda").manual_seed(run_seed)
+                # FLUX is guidance-distilled: no negative_prompt / strength support.
+                return self._flux_pipe(
+                    prompt=prompt or entry.default_prompt,
+                    image=image,
+                    mask_image=mask,
+                    height=RESOLUTION,
+                    width=RESOLUTION,
+                    guidance_scale=(
+                        guidance_scale if guidance_scale is not None else FLUX_GUIDANCE_SCALE
+                    ),
+                    num_inference_steps=(
+                        num_inference_steps
+                        if num_inference_steps is not None
+                        else FLUX_NUM_INFERENCE_STEPS
+                    ),
+                    max_sequence_length=512,
+                    generator=generator,
+                ).images[0]
+
+        # Default: SD1.5 + LoRA.
+        if self._pipe is None:
+            raise RuntimeError("Pipeline not loaded. Did startup run?")
+
+        negative_prompt = negative_prompt or entry.negative_prompt or None
 
         with self._lock:
             self._select_adapter(entry)

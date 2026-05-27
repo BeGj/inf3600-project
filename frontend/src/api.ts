@@ -13,8 +13,11 @@ export interface ModelInfo {
   id: string;
   label: string;
   type: "base" | "lora";
+  family: string; // "sd15" | "flux-fill" — drives which inference params apply
   default_prompt: string;
   negative_prompt: string;
+  available: boolean; // false when backend hardware can't run it (e.g. FLUX, no big GPU)
+  disabled_reason: string | null;
 }
 
 export interface Scene {
@@ -55,6 +58,14 @@ export interface CatalogSearchParams {
   datetime?: string;
   maxCloudCover?: number;
   limit?: number;
+}
+
+export type JobPhase = "queued" | "downloading_model" | "running" | "done" | "error";
+
+export interface InpaintStatusEvent {
+  phase: JobPhase;
+  message: string;
+  elapsedTotalS: number;
 }
 
 function bboxToArray(b: BBox): [number, number, number, number] {
@@ -105,13 +116,32 @@ export interface InpaintOptions {
   numInferenceSteps?: number;
 }
 
+async function pollUntilDone(
+  jobId: string,
+  onStatus: (evt: InpaintStatusEvent) => void,
+): Promise<InpaintResult> {
+  while (true) {
+    await new Promise((r) => setTimeout(r, 2000));
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}`);
+    if (!res.ok) throw new Error(`Job poll failed (${res.status})`);
+    const job = await res.json();
+    onStatus({ phase: job.status, message: job.message, elapsedTotalS: job.elapsed_total_s });
+    if (job.status === "done") {
+      if (!job.result_b64 || !job.result_bbox) throw new Error("Job done but no result");
+      return { image_b64: job.result_b64, bbox: job.result_bbox };
+    }
+    if (job.status === "error") throw new Error(job.error ?? "Job failed with unknown error");
+  }
+}
+
 export async function inpaint(
   bbox: BBox,
   maskGeojson: Polygon,
   prompt: string,
   imageUrl: string,
   modelId: string,
-  opts: InpaintOptions = {}
+  opts: InpaintOptions = {},
+  onStatus?: (evt: InpaintStatusEvent) => void,
 ): Promise<InpaintResult> {
   const body: Record<string, unknown> = {
     bbox: bboxToArray(bbox),
@@ -130,9 +160,17 @@ export async function inpaint(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+  if (res.status === 202) {
+    // FLUX async path: server returned a job ID, poll until done.
+    const { job_id } = await res.json();
+    return pollUntilDone(job_id, onStatus ?? (() => {}));
+  }
+
   if (!res.ok) {
     const detail = await res.text();
     throw new Error(`Inpaint failed (${res.status}): ${detail}`);
   }
+  // SD1.5 synchronous path: result is in the response body directly.
   return res.json();
 }

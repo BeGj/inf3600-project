@@ -19,9 +19,17 @@ import type { Polygon } from "geojson";
 import "ol/ol.css";
 
 export interface ResultOverlay {
+  maskId: string;
   image_b64: string;
   /** [lng_min, lat_min, lng_max, lat_max] WGS-84 */
   bbox: [number, number, number, number];
+  prompt: string;
+  negativePrompt: string;
+  modelId: string;
+  mask: Polygon;
+  guidanceScale: number;
+  strength: number;
+  numInferenceSteps: number;
 }
 
 interface MapViewProps {
@@ -31,6 +39,8 @@ interface MapViewProps {
   clearKey: number;
   /** Footprint to preview on the map (hovered search result), WGS-84, or null. */
   highlightBBox: [number, number, number, number] | null;
+  /** Polygon to show in the draw layer without entering draw mode (e.g. restored from Edit). */
+  preloadMask?: Polygon | null;
   onMaskDrawn: (geojson: Polygon) => void;
   /** Called when the user tries to draw outside the loaded image. */
   onInvalidDraw?: (message: string) => void;
@@ -51,7 +61,7 @@ const HIGHLIGHT_STYLE = {
   "fill-color": "rgba(74,158,255,0.08)",
 };
 
-export default function MapView({ cogUrl, overlays, drawingActive, clearKey, highlightBBox, onMaskDrawn, onInvalidDraw, onMapReady }: MapViewProps) {
+export default function MapView({ cogUrl, overlays, drawingActive, clearKey, highlightBBox, preloadMask, onMaskDrawn, onInvalidDraw, onMapReady }: MapViewProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<Map | null>(null);
   const drawSource = useRef(new VectorSource());
@@ -203,6 +213,22 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
     const extent = transformExtent(highlightBBox, "EPSG:4326", map.getView().getProjection());
     highlightSource.current.addFeature(new Feature(polygonFromExtent(extent)));
   }, [highlightBBox]);
+
+  // Show a pre-existing mask polygon in the draw layer (e.g. restored via Edit).
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    drawSource.current.clear();
+    if (!preloadMask) return;
+    const format = new GeoJSON();
+    const viewProj = map.getView().getProjection();
+    const result = format.readFeature(
+      { type: "Feature", geometry: preloadMask, properties: {} },
+      { featureProjection: viewProj, dataProjection: "EPSG:4326" }
+    );
+    const feature = Array.isArray(result) ? result[0] : result;
+    drawSource.current.addFeature(feature);
+  }, [preloadMask]);
 
   // Clear drawn polygon when clearKey increments
   useEffect(() => {
