@@ -13,8 +13,11 @@ export interface ModelInfo {
   id: string;
   label: string;
   type: "base" | "lora";
+  family: string; // "sd15" | "flux-fill" — drives which inference params apply
   default_prompt: string;
   negative_prompt: string;
+  available: boolean; // false when backend hardware can't run it (e.g. FLUX, no big GPU)
+  disabled_reason: string | null;
 }
 
 export interface Scene {

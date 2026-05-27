@@ -7,6 +7,11 @@ const DEFAULT_GUIDANCE_SCALE = 6.5;
 const DEFAULT_STRENGTH = 1.0;
 const DEFAULT_NUM_INFERENCE_STEPS = 40;
 
+// FLUX.1-Fill-dev is guidance-distilled: no negative prompt / strength, and embedded
+// guidance runs much higher than SD1.5. See backend/app/inference/pipeline.py (FLUX_*).
+const FLUX_GUIDANCE_SCALE = 30;
+const FLUX_NUM_INFERENCE_STEPS = 50;
+
 interface PromptPanelProps {
   models: ModelInfo[];
   modelId: string;
@@ -53,11 +58,19 @@ export default function PromptPanel({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // When the selected model changes, seed the prompt + negative prompt with its
-  // defaults (unless the user has already typed something).
+  // defaults (unless the user has already typed something), and reset the inference
+  // sliders to that family's defaults so the values match what the backend will use.
   const selected = models.find((m) => m.id === modelId);
+  const isFlux = selected?.family === "flux-fill";
   useEffect(() => {
     if (selected && prompt.trim() === "") setPrompt(selected.default_prompt);
     if (selected && negativePrompt.trim() === "") setNegativePrompt(selected.negative_prompt);
+    if (selected) {
+      setGuidanceScale(selected.family === "flux-fill" ? FLUX_GUIDANCE_SCALE : DEFAULT_GUIDANCE_SCALE);
+      setNumInferenceSteps(
+        selected.family === "flux-fill" ? FLUX_NUM_INFERENCE_STEPS : DEFAULT_NUM_INFERENCE_STEPS
+      );
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId]);
 
@@ -71,8 +84,8 @@ export default function PromptPanel({
         <select value={modelId} onChange={(e) => onModelChange(e.target.value)} style={inputStyle}>
           {models.length === 0 && <option value="">Loading…</option>}
           {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
+            <option key={m.id} value={m.id} disabled={!m.available}>
+              {!m.available && m.disabled_reason ? m.disabled_reason : m.label}
             </option>
           ))}
         </select>
@@ -106,16 +119,19 @@ export default function PromptPanel({
         />
       </label>
 
-      <label style={{ fontSize: "0.8rem" }}>
-        Negative prompt
-        <textarea
-          value={negativePrompt}
-          onChange={(e) => setNegativePrompt(e.target.value)}
-          rows={2}
-          placeholder="Things to avoid in the result"
-          style={{ ...inputStyle, resize: "vertical" }}
-        />
-      </label>
+      {/* FLUX is guidance-distilled — it ignores negative prompts, so hide the field. */}
+      {!isFlux && (
+        <label style={{ fontSize: "0.8rem" }}>
+          Negative prompt
+          <textarea
+            value={negativePrompt}
+            onChange={(e) => setNegativePrompt(e.target.value)}
+            rows={2}
+            placeholder="Things to avoid in the result"
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </label>
+      )}
 
       {/* Advanced inference options */}
       <button
@@ -139,25 +155,28 @@ export default function PromptPanel({
             <input
               type="range"
               min={1}
-              max={20}
+              max={isFlux ? 50 : 20}
               step={0.5}
               value={guidanceScale}
               onChange={(e) => setGuidanceScale(Number(e.target.value))}
               style={{ width: "100%" }}
             />
           </label>
-          <label style={{ fontSize: "0.75rem" }}>
-            Strength (how much to alter the region): {strength}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={strength}
-              onChange={(e) => setStrength(Number(e.target.value))}
-              style={{ width: "100%" }}
-            />
-          </label>
+          {/* FluxFillPipeline doesn't use `strength`; hide it for FLUX. */}
+          {!isFlux && (
+            <label style={{ fontSize: "0.75rem" }}>
+              Strength (how much to alter the region): {strength}
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={strength}
+                onChange={(e) => setStrength(Number(e.target.value))}
+                style={{ width: "100%" }}
+              />
+            </label>
+          )}
           <label style={{ fontSize: "0.75rem" }}>
             Inference steps: {numInferenceSteps}
             <input

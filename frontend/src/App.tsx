@@ -28,7 +28,10 @@ export default function App() {
     getModels()
       .then((m) => {
         setModels(m);
-        if (m.length > 0) setModelId(m[0].id);
+        // Default to the first runnable model so a disabled one (e.g. FLUX without a
+        // big-enough GPU) is never auto-selected.
+        const first = m.find((x) => x.available) ?? m[0];
+        if (first) setModelId(first.id);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);

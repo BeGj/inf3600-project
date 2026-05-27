@@ -35,6 +35,12 @@ class ModelEntry:
     default_prompt: str = ""
     negative_prompt: str = ""
     adapter_path: str | None = None
+    # Which inference backend runs this entry: "sd15" (StableDiffusionInpaintPipeline +
+    # LoRA) or "flux-fill" (FluxFillPipeline). Drives engine dispatch and which inference
+    # params the frontend exposes.
+    family: str = "sd15"
+    # HF repo id for non-sd15 families (e.g. "black-forest-labs/FLUX.1-Fill-dev").
+    model_id: str | None = None
 
     @property
     def adapter_dir(self) -> Path | None:
@@ -43,14 +49,21 @@ class ModelEntry:
             return None
         return MODELS_DIR / self.adapter_path
 
-    def public(self) -> dict:
-        """Fields safe to expose to the frontend via GET /models."""
+    def public(self, available: bool = True, disabled_reason: str | None = None) -> dict:
+        """Fields safe to expose to the frontend via GET /models.
+
+        `available`/`disabled_reason` are computed at request time (see the /models
+        handler) because availability depends on backend hardware, not the manifest.
+        """
         return {
             "id": self.id,
             "label": self.label,
             "type": self.type,
+            "family": self.family,
             "default_prompt": self.default_prompt,
             "negative_prompt": self.negative_prompt,
+            "available": available,
+            "disabled_reason": disabled_reason,
         }
 
 
@@ -71,6 +84,8 @@ def load_registry() -> dict[str, ModelEntry]:
             default_prompt=item.get("default_prompt", ""),
             negative_prompt=item.get("negative_prompt", ""),
             adapter_path=item.get("adapter_path"),
+            family=item.get("family", "sd15"),
+            model_id=item.get("model_id"),
         )
         entries[entry.id] = entry
     return entries

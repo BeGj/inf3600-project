@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from .. import catalog, geo
 from ..inference import registry
-from ..inference.pipeline import engine
+from ..inference.pipeline import engine, flux_available
 
 router = APIRouter()
 
@@ -28,9 +28,21 @@ CONTEXT_MARGIN = float(os.environ.get("INPAINT_CONTEXT_MARGIN", "0.5"))
 # ---- /models ---------------------------------------------------------------
 
 
+def _model_availability(entry: registry.ModelEntry) -> tuple[bool, str | None]:
+    """Whether `entry` can run on this backend. sd15 is always available; flux-fill
+    depends on GPU/VRAM/credentials (see pipeline.flux_available)."""
+    if entry.family == "flux-fill":
+        return flux_available()
+    return True, None
+
+
 @router.get("/models")
 def get_models() -> list[dict]:
-    return [m.public() for m in registry.list_models()]
+    out: list[dict] = []
+    for m in registry.list_models():
+        available, reason = _model_availability(m)
+        out.append(m.public(available=available, disabled_reason=reason))
+    return out
 
 
 # ---- catalogues ------------------------------------------------------------
@@ -106,6 +118,12 @@ def inpaint(req: InpaintRequest) -> InpaintResponse:
         entry = registry.get_model(req.model_id)
     except KeyError:
         raise HTTPException(status_code=400, detail=f"Unknown model_id: {req.model_id}")
+
+    # Defensive: the frontend already greys out unavailable models, but a direct API call
+    # could still request one (e.g. FLUX without the hardware).
+    available, reason = _model_availability(entry)
+    if not available:
+        raise HTTPException(status_code=503, detail=reason or "Model unavailable on this backend.")
 
     # Read a larger area than the polygon so the inpainting model has real surrounding
     # imagery to condition on (otherwise it just generates fresh content with no context).
