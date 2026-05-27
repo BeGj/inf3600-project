@@ -7,7 +7,7 @@ import type { ResultOverlay } from "./MapView";
 import PromptPanel from "./PromptPanel";
 import CatalogPanel from "./CatalogPanel";
 import { getModels, inpaint } from "./api";
-import type { BBox, InpaintOptions, ModelInfo, Scene } from "./api";
+import type { BBox, InpaintOptions, InpaintStatusEvent, ModelInfo, Scene } from "./api";
 import "./App.css";
 
 export default function App() {
@@ -19,6 +19,7 @@ export default function App() {
   const [overlays, setOverlays] = useState<ResultOverlay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [clearKey, setClearKey] = useState(0);
   const [hoverBBox, setHoverBBox] = useState<[number, number, number, number] | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -102,15 +103,29 @@ export default function App() {
     async (prompt: string, opts: InpaintOptions) => {
       if (!scene || !mask || !modelId) return;
       setError(null);
+      setStatusMessage(null);
       setLoading(true);
       try {
         const bbox = bboxFromMask(mask);
-        const result = await inpaint(bbox, mask, prompt, scene.visual_href, modelId, opts);
+        const result = await inpaint(
+          bbox, mask, prompt, scene.visual_href, modelId, opts,
+          (evt: InpaintStatusEvent) => {
+            if (evt.phase === "downloading_model") {
+              const m = Math.floor(evt.elapsedTotalS / 60);
+              const s = Math.floor(evt.elapsedTotalS % 60);
+              const elapsed = m > 0 ? `${m}m ${s}s` : `${s}s`;
+              setStatusMessage(`Downloading FLUX model (~34 GB)… This only happens once. Elapsed: ${elapsed}`);
+            } else if (evt.phase === "running") {
+              setStatusMessage("Running inference…");
+            }
+          },
+        );
         setOverlays((prev) => [...prev, { image_b64: result.image_b64, bbox: result.bbox }]);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
+        setStatusMessage(null);
       }
     },
     [scene, mask, modelId, bboxFromMask]
@@ -140,6 +155,7 @@ export default function App() {
           onClearMask={() => { setMask(null); setDrawingActive(false); setClearKey((k) => k + 1); }}
           onGenerate={handleGenerate}
           loading={loading}
+          statusMessage={statusMessage}
           error={error}
         />
       </div>

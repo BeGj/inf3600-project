@@ -23,6 +23,7 @@ interface PromptPanelProps {
   onClearMask: () => void;
   onGenerate: (prompt: string, opts: InpaintOptions) => void;
   loading: boolean;
+  statusMessage: string | null;
   error: string | null;
 }
 
@@ -48,6 +49,7 @@ export default function PromptPanel({
   onClearMask,
   onGenerate,
   loading,
+  statusMessage,
   error,
 }: PromptPanelProps) {
   const [prompt, setPrompt] = useState("");
@@ -218,6 +220,16 @@ export default function PromptPanel({
 
       {!sceneReady && <p style={{ margin: 0, fontSize: "0.75rem", color: "#aaa" }}>Search and select a scene first.</p>}
       {sceneReady && maskReady && !loading && <p style={{ margin: 0, fontSize: "0.75rem", color: "#8f8" }}>Mask ready.</p>}
+      {loading && statusMessage && (
+        <p style={{
+          margin: 0,
+          fontSize: "0.75rem",
+          color: statusMessage.startsWith("Downloading") ? "#f0a500" : "#ccc",
+          lineHeight: 1.4,
+        }}>
+          {statusMessage}
+        </p>
+      )}
       {error && <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>}
     </div>
   );

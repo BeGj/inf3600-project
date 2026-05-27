@@ -19,11 +19,15 @@ dependencies = [
     "shapely>=2.0.6",
     "torch>=2.11.0",
     "transformers>=5.5.3",
+    "torchvision>=0.26.0",
 ]
 
 [tool.uv.sources]
 diffusers = { git = "https://github.com/huggingface/diffusers" }
 torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+torchvision = [
     { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
 ]
 

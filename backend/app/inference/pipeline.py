@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import threading
+from collections.abc import Callable
 from functools import lru_cache
 
 import numpy as np
@@ -116,13 +117,19 @@ class InpaintEngine:
             except Exception:
                 pass
 
-    def _ensure_flux(self) -> None:
+    def _ensure_flux(self, on_loaded: Callable[[], None] | None = None) -> None:
         """Lazy-load FLUX.1-Fill-dev on first use. Caller must hold self._lock.
 
         Loaded on demand (not at startup) so the ~24GB model isn't resident unless someone
         actually picks FLUX, and so boot stays fast for the common SD1.5 path.
+
+        on_loaded fires exactly once after the model is ready — either immediately (already
+        cached) or right after from_pretrained() returns. It fires while the lock is held,
+        which is safe because it only updates a Job's status field.
         """
         if self._flux_pipe is not None:
+            if on_loaded:
+                on_loaded()
             return
         ok, reason = flux_available()
         if not ok:
@@ -140,6 +147,8 @@ class InpaintEngine:
         pipe.enable_model_cpu_offload()
         self._flux_pipe = pipe
         print("[inpaint] FLUX pipeline ready")
+        if on_loaded:
+            on_loaded()
 
     def infer(
         self,
@@ -152,6 +161,7 @@ class InpaintEngine:
         guidance_scale: float | None = None,
         strength: float | None = None,
         num_inference_steps: int | None = None,
+        on_flux_loaded: Callable[[], None] | None = None,
     ) -> Image.Image:
         image = image.convert("RGB").resize((RESOLUTION, RESOLUTION), Image.Resampling.BILINEAR)
         mask = mask.convert("L").resize((RESOLUTION, RESOLUTION), Image.Resampling.NEAREST)
@@ -165,7 +175,7 @@ class InpaintEngine:
 
         if entry.family == "flux-fill":
             with self._lock:
-                self._ensure_flux()
+                self._ensure_flux(on_loaded=on_flux_loaded)
                 # FLUX runs on CUDA (gated by flux_available); generator on the GPU.
                 generator = torch.Generator("cuda").manual_seed(run_seed)
                 # FLUX is guidance-distilled: no negative_prompt / strength support.
