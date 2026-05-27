@@ -51,6 +51,10 @@ def flux_available() -> tuple[bool, str | None]:
     Returns (True, None) when runnable, else (False, human-readable reason). The frontend
     uses the reason to grey out the FLUX option; the /inpaint handler uses it to reject a
     FLUX request defensively. Cached: hardware/env don't change within a process.
+
+    TODO: lru_cache means a token added after startup (e.g. via 'huggingface-cli login')
+          won't be picked up until the process restarts. Acceptable for a demo; call
+          flux_available.cache_clear() if runtime credential refresh is ever needed.
     """
     if not torch.cuda.is_available():
         return False, "FLUX (auto-disabled: backend has no CUDA GPU, requires 24GB+ VRAM)"
@@ -126,6 +130,11 @@ class InpaintEngine:
         on_loaded fires exactly once after the model is ready — either immediately (already
         cached) or right after from_pretrained() returns. It fires while the lock is held,
         which is safe because it only updates a Job's status field.
+
+        TODO: self._lock is held for the full duration of from_pretrained() (potentially
+              hours on a cold cache). This blocks concurrent SD1.5 requests for that entire
+              window. The executor's max_workers=1 means there can't be a concurrent request
+              anyway, but if concurrency is ever increased this will need a separate FLUX lock.
         """
         if self._flux_pipe is not None:
             if on_loaded:

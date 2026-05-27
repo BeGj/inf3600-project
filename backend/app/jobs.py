@@ -47,6 +47,8 @@ class Job:
         }
 
 
+# TODO: _jobs grows unbounded — completed jobs (and their result_b64 images) are never
+#       evicted. Add a TTL sweep or cap (e.g. keep last N) before running this in production.
 _jobs: dict[str, Job] = {}
 _store_lock = threading.Lock()
 _executor = ThreadPoolExecutor(max_workers=1)
