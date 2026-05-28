@@ -1,0 +1,22 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+\title{Team Bodø}
+\author{Nemanja ignjic and Peter Schjem}
+\date{May 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Satellite imagery plays an important role in applications such as environmental monitoring, land use analysis, agriculture, disaster response, and urban planning. However, satellite images often contain missing or corrupted regions caused by cloud cover, sensor failures, transmission errors, or occlusions. Recovering these missing areas is known as image inpainting, where the objective is to reconstruct plausible content while preserving consistency with the surrounding image.
+
+The project topic was selected partly due to previous experience within the group with satellite image analysis and processing. Having prior familiarity with satellite imagery and its characteristics motivated us to investigate a practical problem within this domain. Unlike natural images, satellite images contain distinct patterns and structures such as fields, roads, water bodies, and urban layouts, which can present challenges for general-purpose image generation models.
+
+Instead of developing an entirely new model, the goal of this project was to investigate whether an existing inpainting model could be adapted for satellite imagery. We used the Stable Diffusion 1.5 inpainting model as a baseline and explored the use of Low-Rank Adaptation (LoRA) to improve its performance on satellite images. LoRA provides a lightweight fine-tuning strategy that updates only a small subset of parameters rather than retraining the entire model. This approach reduces computational cost while allowing the model to adapt to image characteristics.
+
+The objective of this project was therefore to determine whether LoRA fine-tuning could improve the quality of satellite image inpainting compared to the original Stable Diffusion 1.5 inpainting model.
+
+\section{Background}
+\end{document}
