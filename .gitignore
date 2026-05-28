@@ -14,9 +14,11 @@ frontend/dist/
 # Model weights (large; ship via volume/release). Keep the manifest + README.
 backend/models/**/*.safetensors
 backend/models/**/*.bin
-# Datasets (keep structure, ignore contents)
+# Datasets. Keep large generated datasets ignored; allow only curated small sets.
 datasets/*
-!datasets/houses/
-!datasets/trees/
+!datasets/.gitignore
+!datasets/README.md
+!datasets/small_house_set/
+!datasets/small_tree_set/
 !datasets/houses/.gitkeep
 !datasets/trees/.gitkeep
