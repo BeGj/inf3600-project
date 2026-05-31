@@ -81,12 +81,14 @@ NEGATIVE_PROMPT = (
 
 RESOLUTION = 512
 TRAIN_BATCH_SIZE = 1
-GRADIENT_ACCUMULATION_STEPS = 4
-LEARNING_RATE = 1e-4
-MAX_TRAIN_STEPS = 3000
-CHECKPOINTING_STEPS = 500
-RANK = 16
-LORA_ALPHA = 16
+GRADIENT_ACCUMULATION_STEPS = (
+    8  # doubled → effective batch 8, much lower gradient variance
+)
+LEARNING_RATE = 2e-5  # was 1e-4; high LR caused the flat/bouncing plateau
+MAX_TRAIN_STEPS = 5000  # longer run to compensate for slower LR
+CHECKPOINTING_STEPS = 1000
+RANK = 8  # was 16; smaller rank generalises better with a small dataset
+LORA_ALPHA = 8  # keep alpha == rank
 MASK_LOSS_WEIGHT = 1.0
 BACKGROUND_LOSS_WEIGHT = 0.1
 SEED = 42
@@ -480,7 +482,7 @@ def main() -> None:
     lr_scheduler = get_scheduler(
         "cosine",
         optimizer=optimizer,
-        num_warmup_steps=100,
+        num_warmup_steps=200,  # was 100; scaled with MAX_TRAIN_STEPS
         num_training_steps=MAX_TRAIN_STEPS,
     )
 
@@ -641,7 +643,7 @@ def main() -> None:
                     "max_train_steps": MAX_TRAIN_STEPS,
                     "learning_rate": LEARNING_RATE,
                     "lr_scheduler": "cosine",
-                    "num_warmup_steps": 100,
+                    "num_warmup_steps": 200,
                     "rank": RANK,
                     "lora_alpha": LORA_ALPHA,
                     "mask_loss_weight": MASK_LOSS_WEIGHT,
