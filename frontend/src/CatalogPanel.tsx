@@ -93,7 +93,7 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
         event: catalog.requires_event ? eventId : undefined,
         datetime: catalog.supports_datetime ? `${start}/${end}` : undefined,
         maxCloudCover: catalog.supports_cloud ? maxCloud : undefined,
-        limit: 12,
+        limit: 50,
       });
       result.sort((a, b) => (b.datetime ?? "").localeCompare(a.datetime ?? ""));
       setScenes(result);

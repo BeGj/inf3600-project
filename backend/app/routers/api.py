@@ -69,7 +69,7 @@ class CatalogSearchRequest(BaseModel):
     catalog: str = catalog.DEFAULT_CATALOG
     event: str | None = None
     datetime: str | None = None
-    limit: int = Field(default=12, ge=1, le=50)
+    limit: int = Field(default=50, ge=1, le=50)
     max_cloud_cover: float | None = Field(default=None, ge=0, le=100)
 
 

@@ -20,7 +20,7 @@ from functools import lru_cache
 from pystac_client import Client
 
 EARTH_SEARCH_URL = "https://earth-search.aws.element84.com/v1"
-DEFAULT_LIMIT = 12
+DEFAULT_LIMIT = 50
 
 BBox = tuple[float, float, float, float]
 
