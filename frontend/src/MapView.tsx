@@ -30,6 +30,7 @@ export interface ResultOverlay {
   guidanceScale: number;
   strength: number;
   numInferenceSteps: number;
+  visible: boolean;
 }
 
 interface MapViewProps {
@@ -188,7 +189,7 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
     overlayLayers.current = [];
 
     const viewProj = map.getView().getProjection();
-    overlays.forEach(({ image_b64, bbox }) => {
+    overlays.forEach(({ image_b64, bbox, visible }) => {
       const [lngMin, latMin, lngMax, latMax] = bbox;
       const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", viewProj);
       const layer = new ImageLayer({
@@ -198,6 +199,7 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
         }),
         opacity: 1,
         zIndex: 2,
+        visible,
       });
       map.addLayer(layer);
       overlayLayers.current.push(layer);

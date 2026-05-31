@@ -141,6 +141,7 @@ export default function App() {
           guidanceScale: opts.guidanceScale ?? 6.5,
           strength: opts.strength ?? 1.0,
           numInferenceSteps: opts.numInferenceSteps ?? 40,
+          visible: true,
         };
         setOverlays((prev) => [
           ...prev.filter((o) => o.maskId !== currentMaskId),
@@ -158,6 +159,10 @@ export default function App() {
 
   const handleRemoveOverlay = useCallback((id: string) => {
     setOverlays((prev) => prev.filter((o) => o.maskId !== id));
+  }, []);
+
+  const handleToggleOverlay = useCallback((id: string) => {
+    setOverlays((prev) => prev.map((o) => o.maskId === id ? { ...o, visible: !o.visible } : o));
   }, []);
 
   const handleZoomToOverlay = useCallback((bbox: [number, number, number, number]) => {
@@ -214,6 +219,7 @@ export default function App() {
         <GeneratedImagesList
           overlays={overlays}
           onRemove={handleRemoveOverlay}
+          onToggle={handleToggleOverlay}
           onZoom={handleZoomToOverlay}
           onEdit={handleEditOverlay}
         />
