@@ -11,7 +11,8 @@ from fastapi.responses import JSONResponse
 from PIL import Image, ImageFilter
 from pydantic import BaseModel, Field
 
-from .. import catalog, geo, jobs as job_store
+from .. import catalog, geo
+from .. import jobs as job_store
 from ..inference import registry
 from ..inference.pipeline import engine, flux_available
 
@@ -61,7 +62,9 @@ def get_catalog_events(catalog_id: str = Query("maxar", alias="catalog")) -> lis
     except KeyError:
         raise HTTPException(status_code=400, detail=f"Unknown catalog: {catalog_id}")
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to list events: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Failed to list events: {exc}"
+        ) from exc
 
 
 class CatalogSearchRequest(BaseModel):
@@ -89,7 +92,9 @@ def catalog_search(req: CatalogSearchRequest) -> list[dict]:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:  # surface STAC / network errors as 502
-        raise HTTPException(status_code=502, detail=f"Catalogue search failed: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Catalogue search failed: {exc}"
+        ) from exc
 
 
 # ---- /inpaint --------------------------------------------------------------
@@ -124,7 +129,9 @@ def inpaint(req: InpaintRequest):
     # could still request one (e.g. FLUX without the hardware).
     available, reason = _model_availability(entry)
     if not available:
-        raise HTTPException(status_code=503, detail=reason or "Model unavailable on this backend.")
+        raise HTTPException(
+            status_code=503, detail=reason or "Model unavailable on this backend."
+        )
 
     # Read a larger area than the polygon so the inpainting model has real surrounding
     # imagery to condition on (otherwise it just generates fresh content with no context).
@@ -135,7 +142,9 @@ def inpaint(req: InpaintRequest):
         image = geo.read_patch(req.image_url, context_bbox)
         mask = geo.rasterize_mask(req.mask_geojson, context_bbox)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to read imagery/mask: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"Failed to read imagery/mask: {exc}"
+        ) from exc
 
     if entry.family != "flux-fill":
         # SD1.5: synchronous — return the result directly, same behavior as before.
@@ -154,7 +163,9 @@ def inpaint(req: InpaintRequest):
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
+            raise HTTPException(
+                status_code=500, detail=f"Inference failed: {exc}"
+            ) from exc
 
         # The model returns a full square covering the bbox, but only the polygon was
         # repainted. Use the polygon mask as the alpha channel so the overlay shows the
@@ -173,7 +184,9 @@ def inpaint(req: InpaintRequest):
     needs_download = engine._flux_pipe is None
     job.set_status(
         "downloading_model" if needs_download else "queued",
-        "Downloading FLUX model (~34 GB)… This only happens once." if needs_download else "Queued",
+        "Downloading FLUX model (~34 GB)… This only happens once."
+        if needs_download
+        else "Queued",
     )
 
     def _run() -> None:

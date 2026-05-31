@@ -57,18 +57,29 @@ def flux_available() -> tuple[bool, str | None]:
           flux_available.cache_clear() if runtime credential refresh is ever needed.
     """
     if not torch.cuda.is_available():
-        return False, "FLUX (auto-disabled: backend has no CUDA GPU, requires 24GB+ VRAM)"
+        return (
+            False,
+            "FLUX (auto-disabled: backend has no CUDA GPU, requires 24GB+ VRAM)",
+        )
     total = torch.cuda.get_device_properties(0).total_memory
     if total < FLUX_MIN_VRAM_BYTES:
         gb = total / 1024**3
         return False, f"FLUX (auto-disabled: GPU has {gb:.0f}GB VRAM, requires 24GB+)"
     try:
         from huggingface_hub import get_token as _get_hf_token
+
         _hf_token = _get_hf_token()
     except Exception:
         _hf_token = None
-    if not (os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN") or _hf_token):
-        return False, "FLUX (auto-disabled: set HF_TOKEN or run 'huggingface-cli login', and accept the FLUX.1-Fill-dev license)"
+    if not (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        or _hf_token
+    ):
+        return (
+            False,
+            "FLUX (auto-disabled: set HF_TOKEN or run 'huggingface-cli login', and accept the FLUX.1-Fill-dev license)",
+        )
     return True, None
 
 
@@ -101,7 +112,9 @@ class InpaintEngine:
             if not adapter_dir.exists():
                 # Manifest references an adapter whose weights were not shipped; skip
                 # rather than crash so the rest of the API still works.
-                print(f"[inpaint] WARNING: adapter dir missing for '{entry.id}': {adapter_dir}")
+                print(
+                    f"[inpaint] WARNING: adapter dir missing for '{entry.id}': {adapter_dir}"
+                )
                 continue
             pipe.load_lora_weights(str(adapter_dir), adapter_name=entry.id)
             self._loaded_adapters.add(entry.id)
@@ -146,8 +159,12 @@ class InpaintEngine:
         from diffusers import FluxFillPipeline
 
         entry = next((e for e in list_models() if e.family == "flux-fill"), None)
-        model_id = (entry.model_id if entry else None) or "black-forest-labs/FLUX.1-Fill-dev"
-        print(f"[inpaint] loading FLUX pipeline '{model_id}' (first request, this is slow)…")
+        model_id = (
+            entry.model_id if entry else None
+        ) or "black-forest-labs/FLUX.1-Fill-dev"
+        print(
+            f"[inpaint] loading FLUX pipeline '{model_id}' (first request, this is slow)…"
+        )
         pipe = FluxFillPipeline.from_pretrained(
             model_id,
             torch_dtype=torch.bfloat16,
@@ -172,15 +189,23 @@ class InpaintEngine:
         num_inference_steps: int | None = None,
         on_flux_loaded: Callable[[], None] | None = None,
     ) -> Image.Image:
-        image = image.convert("RGB").resize((RESOLUTION, RESOLUTION), Image.Resampling.BILINEAR)
-        mask = mask.convert("L").resize((RESOLUTION, RESOLUTION), Image.Resampling.NEAREST)
+        image = image.convert("RGB").resize(
+            (RESOLUTION, RESOLUTION), Image.Resampling.BILINEAR
+        )
+        mask = mask.convert("L").resize(
+            (RESOLUTION, RESOLUTION), Image.Resampling.NEAREST
+        )
         # Force a hard binary mask (white repaints) like the notebook does.
         mask = mask.point(lambda v: 255 if v > 127 else 0)
 
         if float((np.asarray(mask) > 0).mean()) == 0:
             raise ValueError("Mask is empty after rasterization; nothing to inpaint.")
 
-        run_seed = seed if seed is not None else int.from_bytes(os.urandom(4), "big") % 2_147_483_647
+        run_seed = (
+            seed
+            if seed is not None
+            else int.from_bytes(os.urandom(4), "big") % 2_147_483_647
+        )
 
         if entry.family == "flux-fill":
             with self._lock:
@@ -195,7 +220,9 @@ class InpaintEngine:
                     height=RESOLUTION,
                     width=RESOLUTION,
                     guidance_scale=(
-                        guidance_scale if guidance_scale is not None else FLUX_GUIDANCE_SCALE
+                        guidance_scale
+                        if guidance_scale is not None
+                        else FLUX_GUIDANCE_SCALE
                     ),
                     num_inference_steps=(
                         num_inference_steps
@@ -224,9 +251,13 @@ class InpaintEngine:
                 width=RESOLUTION,
                 strength=strength if strength is not None else STRENGTH,
                 num_inference_steps=(
-                    num_inference_steps if num_inference_steps is not None else NUM_INFERENCE_STEPS
+                    num_inference_steps
+                    if num_inference_steps is not None
+                    else NUM_INFERENCE_STEPS
                 ),
-                guidance_scale=guidance_scale if guidance_scale is not None else GUIDANCE_SCALE,
+                guidance_scale=guidance_scale
+                if guidance_scale is not None
+                else GUIDANCE_SCALE,
                 generator=generator,
             ).images[0]
         return result

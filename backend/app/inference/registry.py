@@ -49,7 +49,9 @@ class ModelEntry:
             return None
         return MODELS_DIR / self.adapter_path
 
-    def public(self, available: bool = True, disabled_reason: str | None = None) -> dict:
+    def public(
+        self, available: bool = True, disabled_reason: str | None = None
+    ) -> dict:
         """Fields safe to expose to the frontend via GET /models.
 
         `available`/`disabled_reason` are computed at request time (see the /models
