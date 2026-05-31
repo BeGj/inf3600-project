@@ -1,5 +1,15 @@
 {
     "recommendations": [
-        "james-yu.latex-workshop"
+        "james-yu.latex-workshop",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.vscode-jupyter-cell-tags",
+        "ms-toolsai.jupyter-renderers",
+        "ms-python.vscode-pylance",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "tomoki1207.pdf",
+        "dbaeumer.vscode-eslint",
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode"
     ]
 }

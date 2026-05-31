@@ -126,3 +126,8 @@ button:disabled {
   background: #4a9eff;
   color: #fff;
 }
+
+.generated-list-item .actions button.active {
+  background: #4a9eff;
+  color: #fff;
+}
