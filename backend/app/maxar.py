@@ -81,7 +81,11 @@ def search_event(
             continue
 
         cloud = props.get("tile:clouds_percent")
-        if max_cloud_cover is not None and cloud is not None and cloud > max_cloud_cover:
+        if (
+            max_cloud_cover is not None
+            and cloud is not None
+            and cloud > max_cloud_cover
+        ):
             continue
 
         dt = props.get("datetime")

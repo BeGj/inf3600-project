@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .inference.pipeline import engine
 from .routers import api
 
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Build the inpainting pipeline before serving requests.
