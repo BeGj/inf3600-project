@@ -91,6 +91,7 @@ RANK = 8  # was 16; smaller rank generalises better with a small dataset
 LORA_ALPHA = 8  # keep alpha == rank
 MASK_LOSS_WEIGHT = 1.0
 BACKGROUND_LOSS_WEIGHT = 0.1
+SNR_GAMMA = 5.0  # min-SNR weighting; reduces variance from random timestep sampling
 SEED = 42
 LOCAL_FILES_ONLY = True
 MIXED_PRECISION = "fp16"
@@ -416,6 +417,7 @@ def main() -> None:
                 "lora_alpha": LORA_ALPHA,
                 "mask_loss_weight": MASK_LOSS_WEIGHT,
                 "background_loss_weight": BACKGROUND_LOSS_WEIGHT,
+                "snr_gamma": SNR_GAMMA,
                 "seed": SEED,
                 "mixed_precision": MIXED_PRECISION,
             },
@@ -544,7 +546,8 @@ def main() -> None:
                     return_dict=False,
                 )[0]
 
-                # Mask-weighted loss: emphasise repaint region, retain small background signal
+                # Mask-weighted loss: emphasise repaint region, retain small background signal.
+                # Divide by weight-sum (not .mean()) so mask area doesn't change the loss scale.
                 mask_weight = (
                     masks * MASK_LOSS_WEIGHT + (1.0 - masks) * BACKGROUND_LOSS_WEIGHT
                 )
@@ -552,7 +555,18 @@ def main() -> None:
                 per_element_loss = F.mse_loss(
                     model_pred.float(), noise.float(), reduction="none"
                 )
-                loss = (per_element_loss * mask_weight_latent).mean()
+                loss_per_sample = (per_element_loss * mask_weight_latent).sum(
+                    dim=(1, 2, 3)
+                ) / mask_weight_latent.sum(dim=(1, 2, 3))
+
+                # Min-SNR weighting: down-weights trivially-easy low-timestep steps so
+                # they don't create near-zero spikes that swamp the loss curve.
+                alphas_cumprod = noise_scheduler.alphas_cumprod.to(
+                    device=timesteps.device, dtype=torch.float32
+                )
+                snr = alphas_cumprod[timesteps] / (1.0 - alphas_cumprod[timesteps])
+                snr_weights = (torch.clamp(snr, max=SNR_GAMMA) / snr).detach()
+                loss = (loss_per_sample * snr_weights).mean()
 
                 accelerator.backward(loss)
                 if accelerator.sync_gradients:
@@ -648,6 +662,7 @@ def main() -> None:
                     "lora_alpha": LORA_ALPHA,
                     "mask_loss_weight": MASK_LOSS_WEIGHT,
                     "background_loss_weight": BACKGROUND_LOSS_WEIGHT,
+                    "snr_gamma": SNR_GAMMA,
                     "seed": SEED,
                     "total_elapsed_min": round((time.time() - t_start) / 60, 1),
                 },
