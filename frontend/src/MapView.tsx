@@ -68,7 +68,8 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
   const drawSource = useRef(new VectorSource());
   const highlightSource = useRef(new VectorSource());
   const drawInteraction = useRef<Draw | null>(null);
-  const overlayLayers = useRef<ImageLayer<Static>[]>([]);
+  const overlayLayers = useRef<Record<string, ImageLayer<Static>>>({});
+  const overlayImages = useRef<Record<string, string>>({});
   // Extent of the loaded COG, in the map view projection. Drawing is restricted to it.
   const cogExtent = useRef<number[] | null>(null);
   // True once a COG has replaced the view with its own projection/resolutions.
@@ -112,6 +113,7 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
       source: new GeoTIFF({
         sources: [{ url: cogUrl }],
         normalize: true,
+        convertToRGB: 'auto',
       }),
       zIndex: 1,
     });
@@ -179,30 +181,47 @@ export default function MapView({ cogUrl, overlays, drawingActive, clearKey, hig
     cogExtent.current = null;
   }, [cogUrl]);
 
-  // Sync result overlays
+  // Sync result overlays — reconcile rather than recreate so toggling visibility
+  // on one overlay does not flicker the others.
   useEffect(() => {
     const map = mapInstance.current;
     if (!map) return;
 
-    // Remove old overlay layers
-    overlayLayers.current.forEach((l) => map.removeLayer(l));
-    overlayLayers.current = [];
-
     const viewProj = map.getView().getProjection();
-    overlays.forEach(({ image_b64, bbox, visible }) => {
-      const [lngMin, latMin, lngMax, latMax] = bbox;
-      const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", viewProj);
-      const layer = new ImageLayer({
-        source: new Static({
-          url: `data:image/png;base64,${image_b64}`,
-          imageExtent: extent,
-        }),
-        opacity: 1,
-        zIndex: 2,
-        visible,
-      });
-      map.addLayer(layer);
-      overlayLayers.current.push(layer);
+    const incomingIds = new Set(overlays.map((o) => o.maskId));
+
+    // Remove layers whose overlay has been deleted.
+    for (const maskId of Object.keys(overlayLayers.current)) {
+      if (!incomingIds.has(maskId)) {
+        map.removeLayer(overlayLayers.current[maskId]);
+        delete overlayLayers.current[maskId];
+        delete overlayImages.current[maskId];
+      }
+    }
+
+    // Add new layers; update visibility on existing ones (no recreate = no flicker).
+    // If the same maskId has a new image (re-generate), replace the layer.
+    overlays.forEach(({ maskId, image_b64, bbox, visible }) => {
+      const existingLayer = overlayLayers.current[maskId];
+      if (existingLayer && overlayImages.current[maskId] === image_b64) {
+        existingLayer.setVisible(visible);
+      } else {
+        if (existingLayer) map.removeLayer(existingLayer);
+        const [lngMin, latMin, lngMax, latMax] = bbox;
+        const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", viewProj);
+        const layer = new ImageLayer({
+          source: new Static({
+            url: `data:image/png;base64,${image_b64}`,
+            imageExtent: extent,
+          }),
+          opacity: 1,
+          zIndex: 2,
+          visible,
+        });
+        map.addLayer(layer);
+        overlayLayers.current[maskId] = layer;
+        overlayImages.current[maskId] = image_b64;
+      }
     });
   }, [overlays]);
 

@@ -92,6 +92,9 @@ class InpaintEngine:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.dtype = torch.float16 if self.device == "cuda" else torch.float32
 
+    def is_adapter_loaded(self, model_id: str) -> bool:
+        return model_id in self._loaded_adapters
+
     def load(self) -> None:
         """Build the base pipeline and register every LoRA adapter. Called at startup."""
         pipe = StableDiffusionInpaintPipeline.from_pretrained(

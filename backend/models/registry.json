@@ -24,14 +24,6 @@
       "negative_prompt": "blurry, distorted, low quality, cartoon, warped perspective, repeated artifacts"
     },
     {
-      "id": "osm-nordic",
-      "label": "Nordic Landcover (Sentinel-2)",
-      "type": "lora",
-      "adapter_path": "osm-nordic",
-      "default_prompt": "satellite view, Scandinavian landscape, high resolution",
-      "negative_prompt": "blurry, distorted, low quality, tropical, desert, warped perspective, repeated artifacts, watermark"
-    },
-    {
       "id": "flux-fill",
       "label": "FLUX.1-Fill-dev",
       "type": "base",
@@ -39,6 +31,14 @@
       "model_id": "black-forest-labs/FLUX.1-Fill-dev",
       "default_prompt": "satellite view, high resolution aerial imagery",
       "negative_prompt": ""
+    },
+    {
+      "id": "osm-nordic",
+      "label": "Nordic Landcover (Sentinel-2)",
+      "type": "lora",
+      "adapter_path": "osm-nordic",
+      "default_prompt": "satellite view, Scandinavian landscape, high resolution",
+      "negative_prompt": "blurry, distorted, low quality, tropical, desert, warped perspective, repeated artifacts, watermark"
     }
   ]
 }

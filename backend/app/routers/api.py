@@ -32,9 +32,12 @@ CONTEXT_MARGIN = float(os.environ.get("INPAINT_CONTEXT_MARGIN", "0.5"))
 
 def _model_availability(entry: registry.ModelEntry) -> tuple[bool, str | None]:
     """Whether `entry` can run on this backend. sd15 is always available; flux-fill
-    depends on GPU/VRAM/credentials (see pipeline.flux_available)."""
+    depends on GPU/VRAM/credentials (see pipeline.flux_available); lora depends on
+    whether the adapter weights were found on disk at startup."""
     if entry.family == "flux-fill":
         return flux_available()
+    if entry.type == "lora" and not engine.is_adapter_loaded(entry.id):
+        return False, f"{entry.label} (weights not available locally)"
     return True, None
 
 
