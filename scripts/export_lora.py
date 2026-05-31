@@ -28,7 +28,6 @@ import argparse
 import json
 from pathlib import Path
 
-import torch
 from diffusers import StableDiffusionInpaintPipeline
 
 MODEL_ID = "stable-diffusion-v1-5/stable-diffusion-inpainting"
@@ -38,18 +37,34 @@ REGISTRY_PATH = MODELS_DIR / "registry.json"
 
 
 def export_weights(adapter_dir: Path, out_dir: Path) -> None:
+    import shutil
+
     out_dir.mkdir(parents=True, exist_ok=True)
+    dest = out_dir / "pytorch_lora_weights.safetensors"
+
+    # If already in diffusers format, copy directly — no pipeline round-trip needed.
+    diffusers_weights = adapter_dir / "pytorch_lora_weights.safetensors"
+    if diffusers_weights.exists():
+        shutil.copy2(diffusers_weights, dest)
+        print(f"[export] wrote {dest}")
+        return
+
+    # peft format (adapter_model.safetensors + adapter_config.json): load into
+    # pipeline so diffusers can re-key the tensors, then extract the UNet state dict.
+    import torch
+    from peft import get_peft_model_state_dict
+
     pipe = StableDiffusionInpaintPipeline.from_pretrained(
         MODEL_ID, torch_dtype=torch.float32, safety_checker=None
     )
-    # load_lora_weights accepts both peft and diffusers safetensors layouts.
     pipe.load_lora_weights(str(adapter_dir))
-    pipe.save_lora_weights(
-        str(out_dir),
-        unet_lora_layers=None,  # let diffusers pull the currently-loaded adapter state
+    unet_lora_state_dict = get_peft_model_state_dict(pipe.unet)
+    StableDiffusionInpaintPipeline.save_lora_weights(
+        save_directory=str(out_dir),
+        unet_lora_layers=unet_lora_state_dict,
         safe_serialization=True,
     )
-    print(f"[export] wrote {out_dir / 'pytorch_lora_weights.safetensors'}")
+    print(f"[export] wrote {dest}")
 
 
 def upsert_registry(model_id: str, label: str, prompt: str, negative: str) -> None:
