@@ -1,6 +1,5 @@
 import argparse
 import json
-import math
 from pathlib import Path
 
 from datasets import load_dataset
@@ -26,7 +25,11 @@ def parse_args():
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--image-column", type=str, default="images")
     parser.add_argument("--metadata-column", type=str, default="metadata")
-    parser.add_argument("--prompt", type=str, default="satellite view of trees, canopy cover, urban vegetation")
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        default="satellite view of trees, canopy cover, urban vegetation",
+    )
     parser.add_argument("--radius-scale", type=float, default=1.0)
     parser.add_argument("--min-radius", type=float, default=2.0)
     parser.add_argument("--limit", type=int, default=0)
@@ -63,21 +66,29 @@ def main():
 
     total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(tqdm(dataset, total=total, desc="Building tree pairs")):
+        for index, row in enumerate(
+            tqdm(dataset, total=total, desc="Building tree pairs")
+        ):
             image = row[args.image_column]
             metadata = row[args.metadata_column]
 
             if not isinstance(image, Image.Image):
-                raise TypeError(f"Expected image column '{args.image_column}' to yield PIL images, got {type(image)}")
+                raise TypeError(
+                    f"Expected image column '{args.image_column}' to yield PIL images, got {type(image)}"
+                )
             if not isinstance(metadata, dict):
-                raise TypeError(f"Expected metadata column '{args.metadata_column}' to yield dict objects, got {type(metadata)}")
+                raise TypeError(
+                    f"Expected metadata column '{args.metadata_column}' to yield dict objects, got {type(metadata)}"
+                )
 
             transformed_trees = metadata.get("transformed_trees", [])
             if not transformed_trees:
                 continue
 
             image = image.convert("RGB")
-            mask = draw_tree_mask(image.size, transformed_trees, args.radius_scale, args.min_radius)
+            mask = draw_tree_mask(
+                image.size, transformed_trees, args.radius_scale, args.min_radius
+            )
 
             stem = f"{index:06d}"
             image_name = f"{stem}.png"
@@ -108,7 +119,9 @@ def main():
         "count": count,
         "output_dir": str(args.output_dir),
     }
-    (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (args.output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
     print(json.dumps(summary, indent=2))
 
 

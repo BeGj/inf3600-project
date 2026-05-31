@@ -43,7 +43,6 @@ import rasterio.transform
 from PIL import Image
 from pystac_client import Client
 from rasterio.enums import Resampling
-from rasterio.features import rasterize as rasterize_features
 from rasterio.warp import transform_bounds
 from rasterio.windows import from_bounds
 from tqdm import tqdm
@@ -68,16 +67,19 @@ GDAL_ENV = {
 
 # ─── Land-cover class definitions ────────────────────────────────────────────
 
+
 @dataclass
 class ClassDef:
     name: str
-    wc_values: list[int]   # ESA WorldCover pixel values that count as this class
+    wc_values: list[int]  # ESA WorldCover pixel values that count as this class
     prompt: str
     anchors: list[tuple[float, float]]  # [(lon, lat), ...]
     # Per-class overrides; None falls back to the CLI --jitter / --min-coverage values
     jitter: float | None = None
     min_coverage: float | None = None
-    max_coverage: float = 0.90  # tiles above this have too little context for inpainting
+    max_coverage: float = (
+        0.90  # tiles above this have too little context for inpainting
+    )
 
 
 LAND_COVER_CLASSES: dict[str, ClassDef] = {
@@ -86,13 +88,14 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         wc_values=[10],  # Tree cover
         prompt="satellite view of Scandinavian boreal forest, dense dark coniferous canopy",
         anchors=[
-            (11.5, 61.5),   # Østerdalen, Norway
-            (12.0, 62.3),   # Femundsmarka, Norway
-            (14.5, 61.0),   # Dalarna, Sweden
-            (27.0, 62.5),   # Finnish Lakeland
-            (10.5, 63.5),   # Trøndelag, Norway
+            (11.5, 61.5),  # Østerdalen, Norway
+            (12.0, 62.3),  # Femundsmarka, Norway
+            (14.5, 61.0),  # Dalarna, Sweden
+            (27.0, 62.5),  # Finnish Lakeland
+            (10.5, 63.5),  # Trøndelag, Norway
         ],
-        jitter=1.5, min_coverage=0.30,
+        jitter=1.5,
+        min_coverage=0.30,
     ),
     "nordic_urban": ClassDef(
         name="nordic_urban",
@@ -100,9 +103,9 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         prompt="satellite view of Norwegian residential neighborhood, timber houses, streets",
         anchors=[
             (10.75, 59.91),  # Oslo city centre
-            (5.32, 60.39),   # Bergen
+            (5.32, 60.39),  # Bergen
             (10.40, 63.43),  # Trondheim
-            (5.73, 58.97),   # Stavanger
+            (5.73, 58.97),  # Stavanger
             (18.07, 59.33),  # Stockholm
             (24.94, 60.17),  # Helsinki
             (10.55, 59.68),  # Ski / Follo, Oslo suburb
@@ -110,7 +113,8 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         ],
         # Tight jitter keeps tiles over city centres; urban fabric rarely exceeds 40%
         # in a 5 km tile even in dense Nordic cities.
-        jitter=0.08, min_coverage=0.15,
+        jitter=0.08,
+        min_coverage=0.15,
     ),
     "farmland": ClassDef(
         name="farmland",
@@ -118,14 +122,15 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         prompt="satellite view of Nordic agricultural fields, patchwork cropland",
         anchors=[
             (5.60, 58.75),  # Jæren, Norway — flattest farmland in Norway
-            (10.30, 59.20), # Vestfold, Norway
-            (13.50, 55.70), # Skåne, Sweden
+            (10.30, 59.20),  # Vestfold, Norway
+            (13.50, 55.70),  # Skåne, Sweden
             (9.50, 56.00),  # Jutland, Denmark
-            (15.50, 58.40), # Östergötland, Sweden
-            (11.20, 59.10), # Østfold, Norway
-            (10.20, 55.90), # Funen, Denmark
+            (15.50, 58.40),  # Östergötland, Sweden
+            (11.20, 59.10),  # Østfold, Norway
+            (10.20, 55.90),  # Funen, Denmark
         ],
-        jitter=0.4, min_coverage=0.25,
+        jitter=0.4,
+        min_coverage=0.25,
     ),
     "water": ClassDef(
         name="water",
@@ -134,28 +139,31 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         anchors=[
             (6.30, 61.00),  # Sognefjord
             (6.50, 60.30),  # Hardangerfjord
-            (10.50, 59.40), # Oslofjord
-            (10.80, 60.70), # Mjøsa lake, Norway
-            (11.80, 62.00), # Femunden lake, Norway
-            (13.00, 58.90), # Vänern, Sweden
-            (28.20, 61.30), # Saimaa, Finland
+            (10.50, 59.40),  # Oslofjord
+            (10.80, 60.70),  # Mjøsa lake, Norway
+            (11.80, 62.00),  # Femunden lake, Norway
+            (13.00, 58.90),  # Vänern, Sweden
+            (28.20, 61.30),  # Saimaa, Finland
         ],
         # Lower min so shore tiles (fjord edge + mountain) are included.
         # Lower max so fully-open-water tiles without any land context are rejected.
-        jitter=0.6, min_coverage=0.20, max_coverage=0.80,
+        jitter=0.6,
+        min_coverage=0.20,
+        max_coverage=0.80,
     ),
     "alpine": ClassDef(
         name="alpine",
         wc_values=[60, 100],  # Bare/sparse vegetation + moss/lichen
         prompt="satellite view of Norwegian alpine terrain, rocky mountain above treeline",
         anchors=[
-            (8.4, 61.6),   # Jotunheimen
-            (7.5, 60.4),   # Hardangervidda
-            (9.8, 62.0),   # Rondane
-            (9.5, 62.3),   # Dovrefjell
-            (9.0, 62.8),   # Trollheimen
+            (8.4, 61.6),  # Jotunheimen
+            (7.5, 60.4),  # Hardangervidda
+            (9.8, 62.0),  # Rondane
+            (9.5, 62.3),  # Dovrefjell
+            (9.0, 62.8),  # Trollheimen
         ],
-        jitter=1.0, min_coverage=0.25,
+        jitter=1.0,
+        min_coverage=0.25,
     ),
     "heath": ClassDef(
         name="heath",
@@ -169,11 +177,12 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
             (9.00, 57.00),  # Jutland heathland, Denmark
             (9.10, 56.00),  # Kongenshus heath reserve, Denmark
             (8.60, 56.30),  # Harrild heath, Denmark
-            (-3.00, 57.50), # Scottish Highlands — extensive shrubland/heath
-            (-4.50, 58.00), # Caithness moor, Scotland
+            (-3.00, 57.50),  # Scottish Highlands — extensive shrubland/heath
+            (-4.50, 58.00),  # Caithness moor, Scotland
         ],
         # WorldCover shrubland is patchy in Norway; lower threshold catches mixed tiles
-        jitter=0.5, min_coverage=0.10,
+        jitter=0.5,
+        min_coverage=0.10,
     ),
     "industrial": ClassDef(
         name="industrial",
@@ -181,13 +190,14 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
         prompt="satellite view of Scandinavian industrial zone, warehouses, large structures",
         anchors=[
             (10.50, 59.75),  # Oslo Alnabru industrial
-            (5.02, 60.81),   # Mongstad refinery, Norway
+            (5.02, 60.81),  # Mongstad refinery, Norway
             (17.40, 68.40),  # Narvik industrial port
             (11.90, 57.70),  # Gothenburg port, Sweden
             (24.50, 65.70),  # Kemi, Finland
             (10.97, 59.91),  # Romerike logistics, Norway
         ],
-        jitter=0.04, min_coverage=0.15,
+        jitter=0.04,
+        min_coverage=0.15,
     ),
     "grassland": ClassDef(
         name="grassland",
@@ -199,29 +209,32 @@ LAND_COVER_CLASSES: dict[str, ClassDef] = {
             (14.00, 56.50),  # Småland, Sweden
             (10.00, 56.20),  # Fyn, Denmark
             (25.00, 60.50),  # Southern Finland
-            (9.20, 56.50),   # Jutland grassland, Denmark
+            (9.20, 56.50),  # Jutland grassland, Denmark
             (12.50, 56.00),  # Skåne coast grassland, Sweden
         ],
-        jitter=0.6, min_coverage=0.15,
+        jitter=0.6,
+        min_coverage=0.15,
     ),
     "airport": ClassDef(
         name="airport",
         wc_values=[50],  # Built-up (at airport anchors — very tight jitter)
         prompt="satellite view of Norwegian airport, runways, taxiways, terminal buildings",
         anchors=[
-            (11.10, 60.20),   # Oslo Gardermoen
-            (5.23, 60.29),    # Bergen Flesland
-            (5.63, 58.88),    # Stavanger Sola
-            (10.93, 63.46),   # Trondheim Værnes
-            (17.93, 59.65),   # Stockholm Arlanda
-            (24.96, 60.33),   # Helsinki-Vantaa
+            (11.10, 60.20),  # Oslo Gardermoen
+            (5.23, 60.29),  # Bergen Flesland
+            (5.63, 58.88),  # Stavanger Sola
+            (10.93, 63.46),  # Trondheim Værnes
+            (17.93, 59.65),  # Stockholm Arlanda
+            (24.96, 60.33),  # Helsinki-Vantaa
         ],
         # Nearly zero jitter: tiles must stay over the airport footprint
-        jitter=0.02, min_coverage=0.20,
+        jitter=0.02,
+        min_coverage=0.20,
     ),
 }
 
 # ─── Tile candidate generation ────────────────────────────────────────────────
+
 
 def generate_tile_candidates(
     class_def: ClassDef,
@@ -243,7 +256,9 @@ def generate_tile_candidates(
         candidates.append((lon - half, lat - half, lon + half, lat + half))
     return candidates
 
+
 # ─── ESA WorldCover ───────────────────────────────────────────────────────────
+
 
 def _worldcover_tile_name(lat: float, lon: float) -> str:
     """Return the WorldCover 3°×3° tile name covering the given point."""
@@ -303,6 +318,7 @@ def wc_mask_image(lc_patch: np.ndarray, target_values: list[int]) -> Image.Image
         mask |= lc_patch == v
     return Image.fromarray(np.where(mask, np.uint8(255), np.uint8(0)), mode="L")
 
+
 # ─── Sentinel-2 scene lookup ─────────────────────────────────────────────────
 
 _stac_client: Client | None = None
@@ -346,7 +362,9 @@ def fetch_sentinel_href(
             continue
     return None
 
+
 # ─── COG patch reading (inline copy from backend/app/geo.py) ─────────────────
+
 
 def _to_uint8_rgb(data: np.ndarray) -> np.ndarray:
     bands = data.shape[0]
@@ -393,15 +411,25 @@ def read_patch_inline(href: str, bbox: BBox) -> Image.Image | None:
         return None
     return Image.fromarray(_to_uint8_rgb(data), mode="RGB")
 
+
 # ─── Quality guards ───────────────────────────────────────────────────────────
 
-def is_too_bright(image: Image.Image, threshold: int = 210, max_fraction: float = 0.25) -> bool:
+
+def is_too_bright(
+    image: Image.Image, threshold: int = 210, max_fraction: float = 0.25
+) -> bool:
     """Detect snow- or cloud-contaminated patches by near-white pixel fraction."""
     arr = np.array(image)
-    bright = (arr[:, :, 0] > threshold) & (arr[:, :, 1] > threshold) & (arr[:, :, 2] > threshold)
+    bright = (
+        (arr[:, :, 0] > threshold)
+        & (arr[:, :, 1] > threshold)
+        & (arr[:, :, 2] > threshold)
+    )
     return float(bright.mean()) > max_fraction
 
+
 # ─── Per-tile pipeline ────────────────────────────────────────────────────────
+
 
 def process_tile(
     idx: int,
@@ -418,7 +446,11 @@ def process_tile(
         if verbose:
             print(f"    skip: {reason}")
 
-    min_cov = class_def.min_coverage if class_def.min_coverage is not None else default_min_coverage
+    min_cov = (
+        class_def.min_coverage
+        if class_def.min_coverage is not None
+        else default_min_coverage
+    )
     max_cov = class_def.max_coverage
 
     # 1. Read WorldCover land-cover patch
@@ -433,7 +465,9 @@ def process_tile(
         reject(f"WorldCover coverage {coverage:.1%} < min {min_cov:.0%}")
         return None
     if coverage > max_cov:
-        reject(f"WorldCover coverage {coverage:.1%} > {max_cov:.0%} (too little context)")
+        reject(
+            f"WorldCover coverage {coverage:.1%} > {max_cov:.0%} (too little context)"
+        )
         return None
 
     # 3. Fetch best Sentinel-2 scene
@@ -477,25 +511,51 @@ def process_tile(
         "source": "sentinel-2+worldcover",
     }
 
+
 # ─── CLI ──────────────────────────────────────────────────────────────────────
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Prepare Norwegian/North European Sentinel-2 + ESA WorldCover inpainting dataset."
     )
-    parser.add_argument("--output-dir", type=Path, default=REPO_ROOT / "datasets" / "osm_nordic")
-    parser.add_argument("--per-class", type=int, default=150, help="Target tiles per class")
-    parser.add_argument("--min-coverage", type=float, default=0.30,
-                        help="Min WorldCover class fraction per tile (default 0.30)")
-    parser.add_argument("--max-cloud", type=float, default=15.0, help="Max Sentinel-2 cloud cover %%")
+    parser.add_argument(
+        "--output-dir", type=Path, default=REPO_ROOT / "datasets" / "osm_nordic"
+    )
+    parser.add_argument(
+        "--per-class", type=int, default=150, help="Target tiles per class"
+    )
+    parser.add_argument(
+        "--min-coverage",
+        type=float,
+        default=0.30,
+        help="Min WorldCover class fraction per tile (default 0.30)",
+    )
+    parser.add_argument(
+        "--max-cloud", type=float, default=15.0, help="Max Sentinel-2 cloud cover %%"
+    )
     parser.add_argument("--date-range", type=str, default="2023-05-01/2024-09-30")
-    parser.add_argument("--tile-deg", type=float, default=0.046,
-                        help="Tile width/height in degrees (default 0.046 ≈ 5 km at S2 10m/px)")
-    parser.add_argument("--jitter", type=float, default=1.5, help="Anchor jitter radius in degrees")
+    parser.add_argument(
+        "--tile-deg",
+        type=float,
+        default=0.046,
+        help="Tile width/height in degrees (default 0.046 ≈ 5 km at S2 10m/px)",
+    )
+    parser.add_argument(
+        "--jitter", type=float, default=1.5, help="Anchor jitter radius in degrees"
+    )
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--limit", type=int, default=0, help="Hard cap on total tiles (0 = unlimited)")
-    parser.add_argument("--classes", nargs="*", default=None, help="Subset of class names to process")
-    parser.add_argument("--verbose", action="store_true", help="Print rejection reason per discarded tile")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Hard cap on total tiles (0 = unlimited)"
+    )
+    parser.add_argument(
+        "--classes", nargs="*", default=None, help="Subset of class names to process"
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print rejection reason per discarded tile",
+    )
     return parser.parse_args()
 
 
@@ -575,7 +635,9 @@ def main() -> None:
         "date_range": args.date_range,
         "seed": args.seed,
     }
-    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
     print("\n" + json.dumps(summary, indent=2))
 
 

@@ -26,7 +26,11 @@ def parse_args():
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--image-column", type=str, default=None)
     parser.add_argument("--mask-column", type=str, default=None)
-    parser.add_argument("--prompt", type=str, default="satellite view of small houses, roof geometry, driveways, residential block")
+    parser.add_argument(
+        "--prompt",
+        type=str,
+        default="satellite view of small houses, roof geometry, driveways, residential block",
+    )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--invert-mask", action="store_true")
     return parser.parse_args()
@@ -35,7 +39,9 @@ def parse_args():
 def choose_column(row, explicit_name, candidates, description):
     if explicit_name is not None:
         if explicit_name not in row:
-            raise KeyError(f"{description} column '{explicit_name}' not found. Available columns: {list(row.keys())}")
+            raise KeyError(
+                f"{description} column '{explicit_name}' not found. Available columns: {list(row.keys())}"
+            )
         return explicit_name
 
     for candidate in candidates:
@@ -69,7 +75,9 @@ def as_pil_image(value, mode_hint):
     else:
         array = np.asarray(value)
         if array.ndim not in {2, 3}:
-            raise TypeError(f"Expected image-like data with 2 or 3 dimensions, got shape {array.shape}")
+            raise TypeError(
+                f"Expected image-like data with 2 or 3 dimensions, got shape {array.shape}"
+            )
 
         if np.issubdtype(array.dtype, np.floating):
             if array.max() <= 1.0:
@@ -125,12 +133,16 @@ def main():
 
     total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
-        for index, row in enumerate(tqdm(dataset, total=total, desc="Building image/mask pairs")):
+        for index, row in enumerate(
+            tqdm(dataset, total=total, desc="Building image/mask pairs")
+        ):
             image = row[image_column]
             mask = row[mask_column]
 
             image = as_pil_image(image, mode_hint="image")
-            mask = normalize_mask(as_pil_image(mask, mode_hint="mask"), invert_mask=args.invert_mask)
+            mask = normalize_mask(
+                as_pil_image(mask, mode_hint="mask"), invert_mask=args.invert_mask
+            )
             if mask.getbbox() is None:
                 skipped_empty_masks += 1
                 continue
@@ -166,7 +178,9 @@ def main():
         "skipped_empty_masks": skipped_empty_masks,
         "output_dir": str(args.output_dir),
     }
-    (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (args.output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
     print(json.dumps(summary, indent=2))
 
 
