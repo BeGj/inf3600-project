@@ -121,6 +121,7 @@ def main():
 
     metadata_path = args.output_dir / "metadata.jsonl"
     count = 0
+    skipped_empty_masks = 0
 
     total = min(args.limit, len(dataset)) if args.limit > 0 else len(dataset)
     with metadata_path.open("w", encoding="utf-8") as handle:
@@ -130,6 +131,9 @@ def main():
 
             image = as_pil_image(image, mode_hint="image")
             mask = normalize_mask(as_pil_image(mask, mode_hint="mask"), invert_mask=args.invert_mask)
+            if mask.getbbox() is None:
+                skipped_empty_masks += 1
+                continue
 
             stem = f"{index:06d}"
             image_name = f"{stem}.png"
@@ -159,6 +163,7 @@ def main():
         "image_column": image_column,
         "mask_column": mask_column,
         "count": count,
+        "skipped_empty_masks": skipped_empty_masks,
         "output_dir": str(args.output_dir),
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
