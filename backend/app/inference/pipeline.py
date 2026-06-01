@@ -18,13 +18,23 @@ import os
 import threading
 from collections.abc import Callable
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
-from diffusers import StableDiffusionInpaintPipeline
+
+# Import from the concrete module rather than the top-level `diffusers` package: the
+# package re-export resolves (for type checkers) to a union with a dummy placeholder class
+# that lacks __call__/set_adapters, producing spurious type errors.
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_inpaint import (
+    StableDiffusionInpaintPipeline,
+)
 from PIL import Image
 
 from .registry import ModelEntry, list_models
+
+if TYPE_CHECKING:
+    from diffusers.pipelines.flux.pipeline_flux_fill import FluxFillPipeline
 
 MODEL_ID = "stable-diffusion-v1-5/stable-diffusion-inpainting"
 RESOLUTION = 512
@@ -86,7 +96,8 @@ def flux_available() -> tuple[bool, str | None]:
 class InpaintEngine:
     def __init__(self) -> None:
         self._pipe: StableDiffusionInpaintPipeline | None = None
-        self._flux_pipe = None  # FluxFillPipeline, lazy-loaded on first FLUX request
+        # FluxFillPipeline, lazy-loaded on first FLUX request.
+        self._flux_pipe: FluxFillPipeline | None = None
         self._loaded_adapters: set[str] = set()
         self._lock = threading.Lock()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -213,6 +224,7 @@ class InpaintEngine:
         if entry.family == "flux-fill":
             with self._lock:
                 self._ensure_flux(on_loaded=on_flux_loaded)
+                assert self._flux_pipe is not None  # _ensure_flux guarantees this
                 # FLUX runs on CUDA (gated by flux_available); generator on the GPU.
                 generator = torch.Generator("cuda").manual_seed(run_seed)
                 # FLUX is guidance-distilled: no negative_prompt / strength support.

@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import urllib.request
 from functools import lru_cache
+from typing import Any
 
 from shapely.geometry import box, shape
 
@@ -33,7 +34,7 @@ BBox = tuple[float, float, float, float]
 _WORLD = (-179.9, -85.0, 179.9, 85.0)
 
 
-def _fetch_json(url: str) -> object:
+def _fetch_json(url: str) -> Any:
     req = urllib.request.Request(url, headers={"User-Agent": "satellite-genfill"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode("utf-8"))
@@ -44,7 +45,7 @@ def list_events() -> list[dict]:
     """Available Maxar events, from the opengeos `datasets/` listing."""
     entries = _fetch_json(GITHUB_DATASETS_API)
     events: list[dict] = []
-    for entry in entries:  # type: ignore[union-attr]
+    for entry in entries:
         name = entry.get("name", "")
         if not name.endswith(".geojson") or name.endswith("_union.geojson"):
             continue
@@ -57,7 +58,7 @@ def list_events() -> list[dict]:
 @lru_cache(maxsize=16)
 def _event_features(event: str) -> tuple[dict, ...]:
     data = _fetch_json(f"{GEOJSON_BASE}/{event}.geojson")
-    return tuple(data.get("features", []))  # type: ignore[union-attr]
+    return tuple(data.get("features", []))
 
 
 def search_event(

@@ -39,4 +39,11 @@ explicit = true
 [dependency-groups]
 dev = [
     "ruff>=0.15.15",
+    "ty>=0.0.40",
 ]
+
+[tool.ty.environment]
+python-version = "3.12"
+
+[tool.ty.src]
+include = ["app"]
