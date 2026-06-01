@@ -1,0 +1,52 @@
+# Launches the inpainting backend (FastAPI + SD1.5/LoRA) and the frontend (Vite
+# build served by nginx). The browser streams COGs and calls the backend
+# directly, so the frontend is built with VITE_API_URL pointing at the backend's
+# host-published URL (http://localhost:8000), not its in-network name.
+#
+#   docker compose up --build
+#     frontend  -> http://localhost:5173
+#     backend   -> http://localhost:8000  (docs at /docs)
+#
+# Real inference needs an NVIDIA GPU; see the `deploy` block on the backend.
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:80"
+    environment:
+      # Set to 0 on first run to allow the ~2GB base model download.
+      HF_INPAINT_LOCAL_ONLY: "${HF_INPAINT_LOCAL_ONLY:-0}"
+      # Optional: token for gated models (e.g. FLUX.1-Fill-dev).
+      HF_TOKEN: "${HF_TOKEN:-}"
+      # Persist the model cache inside the mounted volume.
+      HF_HOME: /huggingface
+    volumes:
+      # Cache downloaded weights across restarts.
+      - hf-cache:/huggingface
+    # GPU access. Requires the NVIDIA Container Toolkit on the host.
+    # Comment this block out to run CPU-only (slow).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the bundle at build time (read in src/api.ts).
+        VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  hf-cache:
