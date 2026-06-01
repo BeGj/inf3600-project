@@ -19,11 +19,11 @@ model, and get back an inpainted patch overlaid in place.
 
 Three parts of the repo:
 
-| Dir          | What it is                                                              |
-| ------------ | ----------------------------------------------------------------------- |
-| `frontend/`  | React 19 + Vite + OpenLayers map UI.                                    |
-| `backend/`   | FastAPI service: catalogue search + COG reading + inpainting inference. |
-| `notebooks/` | LoRA training + dataset prep ([details](notebooks/README.md)).          |
+| Dir                          | What it is                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [`frontend/` ](./frontend/)  | React 19 + Vite + OpenLayers map UI ([details](frontend/README.md)).                                   |
+| [`backend/` ](./backend/)    | FastAPI service: catalogue search + COG reading + inpainting inference ([details](backend/README.md)). |
+| [`notebooks/`](./notebooks/) | LoRA training + dataset prep ([details](notebooks/README.md)).                                         |
 
 ## Prerequisites
 
