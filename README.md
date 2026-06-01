@@ -118,7 +118,7 @@ npm run dev        # http://localhost:5173
 
 ### Norwegian palace -> Lake
 
-![Generated inpaint of a lake instead of the Norwegian palace](image2.png)
+![Generated inpaint of a lake instead of the Norwegian palace](.docs/image2.png)
 
 ### Norwegian palace -> Forest
 
