@@ -32,6 +32,31 @@ Three parts of the repo:
 - A **CUDA GPU** for usable inference latency, preferably with either 10gb+ or 22gb+ vram (22 needed for flux.1 model)
 - Trained LoRA weights exported into `backend/models/` (see step 1).
 
+## Quick start (Docker Compose)
+
+The fastest way to get both services up. Requires **Docker** + **Docker Compose**, and the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+on the host for GPU inference.
+
+```bash
+# Optional: token for the gated flux-fill model; skip if you only use base/LoRA.
+export HF_TOKEN=hf_...
+
+docker compose up --build
+#   frontend -> http://localhost:5173
+#   backend  -> http://localhost:8000  (docs at /docs)
+```
+
+- **First build is slow (~5–7 min)** — the backend image bundles PyTorch + CUDA + diffusers
+  (several GB). Later builds reuse the cached dependency layer and are much faster.
+- On **first run** the backend downloads the ~2GB base model into the `hf-cache` volume, so it
+  persists across restarts (`HF_INPAINT_LOCAL_ONLY` defaults to `0` to allow this).
+- **LoRA weights** are bind-mounted from `./backend/models` into the container. Export them
+  first (step 1 below) or run with only the **Base** model. A `docker compose restart` picks up
+  newly-exported adapters without rebuilding.
+
+For local development without containers (hot reload, etc.), use the manual setup below.
+
 ## Get started
 
 ### 1. Export models into the backend
