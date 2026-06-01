@@ -20,7 +20,7 @@ model, and get back an inpainted patch overlaid in place.
 Three parts of the repo:
 
 | Dir          | What it is                                                              |
-|--------------|-------------------------------------------------------------------------|
+| ------------ | ----------------------------------------------------------------------- |
 | `frontend/`  | React 19 + Vite + OpenLayers map UI.                                    |
 | `backend/`   | FastAPI service: catalogue search + COG reading + inpainting inference. |
 | `notebooks/` | LoRA training + dataset prep ([details](notebooks/README.md)).          |
@@ -28,8 +28,8 @@ Three parts of the repo:
 ## Prerequisites
 
 - [`uv`](https://docs.astral.sh/uv/) (Python tooling) and **Python 3.12**.
-- Node.js LTS + npm.
-- A **CUDA GPU** for usable inference latency (CPU runs but is slow).
+- Node.js LTS + npm. (Recommend to manage node version through [NVM](https://github.com/nvm-sh/nvm) )
+- A **CUDA GPU** for usable inference latency, preferably with either 10gb+ or 22gb+ vram (22 needed for flux.1 model)
 - Trained LoRA weights exported into `backend/models/` (see step 1).
 
 ## Get started
@@ -42,17 +42,12 @@ notebooks env (which has torch/diffusers/peft):
 ```bash
 cd notebooks
 uv sync
-uv run python ../scripts/export_lora.py \
-  --id houses --label "Houses" \
-  --adapter outputs/lora_houses \
-  --prompt "satellite view of small houses, roof geometry, driveways, residential block" \
-  --negative "blurry, distorted, repeated roofs, warped perspective, low quality"
 
 uv run python ../scripts/export_lora.py \
-  --id trees --label "Trees" \
-  --adapter outputs/lora_trees \
-  --prompt "satellite view of trees, canopy cover, urban vegetation" \
-  --negative "blurry, distorted, low quality, cartoon, warped perspective, repeated artifacts"
+  --id osm-nordic --label "Nordic Landcover (Sentinel-2)" \
+  --adapter outputs/lora_osm_nordic \
+  --prompt "satellite view, Scandinavian landscape, high resolution" \
+  --negative "blurry, distorted, low quality, tropical, desert, warped perspective, repeated artifacts, watermark"
 ```
 
 This writes git-ignored weights to `backend/models/<id>/` and updates the committed
@@ -88,70 +83,3 @@ npm run dev        # http://localhost:5173
 2. **Find imagery** → set date range + max cloud cover → **Search this view** → pick a scene.
 3. Choose a **Model**, **Draw Mask** over a region, edit the **Prompt**, then **Generate**.
 4. The inpainted patch overlays at the correct geographic extent; **Download Last Patch** saves it.
-
-## Configuration
-
-| Where    | Variable               | Default                              | Purpose                                    |
-|----------|------------------------|--------------------------------------|--------------------------------------------|
-| backend  | `HF_INPAINT_LOCAL_ONLY`| `1`                                  | Set `0` on first run to download the base model. |
-| backend  | `ALLOWED_ORIGINS`      | `http://localhost:5173,…127.0.0.1…`  | Comma-separated CORS origins.              |
-| backend  | `INPAINT_CONTEXT_MARGIN`| `0.5`                               | Extra imagery read around the polygon (per side, as a fraction of its bbox) for the model to blend with. Higher = more context, smaller repaint region in-frame. |
-| frontend | `VITE_API_URL`         | `http://localhost:8000`              | Backend base URL (set in `frontend/.env`). |
-
-## API reference
-
-| Method | Path              | Body / params                                              | Returns                       |
-|--------|-------------------|------------------------------------------------------------|-------------------------------|
-| GET    | `/models`         | —                                                          | `[{id,label,type,default_prompt}]` |
-| GET    | `/catalogs`       | —                                                          | `[{id,label,resolution_m,coverage,supports_cloud,supports_datetime,requires_event}]` |
-| GET    | `/catalog/events` | `?catalog=maxar`                                           | `[{id,label}]` (event-based catalogues) |
-| POST   | `/catalog/search` | `{bbox,catalog,event?,datetime?,limit?,max_cloud_cover?}`  | `[{id,datetime,cloud_cover,bbox,visual_href,thumbnail}]` |
-| POST   | `/inpaint`        | `{image_url,bbox,mask_geojson,prompt,model_id,seed?}`      | `{image_b64,bbox}`            |
-
-Full schemas at `/docs`.
-
-## Developing further
-
-**Project layout (backend):**
-
-```
-backend/app/
-├── main.py                  # app + CORS + startup (loads the pipeline)
-├── routers/api.py           # /models, /catalog/search, /inpaint
-├── catalog.py               # STAC search (Earth Search)
-├── geo.py                   # COG window read + mask rasterization
-└── inference/
-    ├── registry.py          # reads models/registry.json
-    └── pipeline.py          # singleton SD inpaint pipeline + LoRA adapters
-```
-
-Common extensions:
-
-- **Add a new LoRA model** — train it (see [`notebooks/README.md`](notebooks/README.md)),
-  then run `scripts/export_lora.py --id <name> ...`. It appears in `/models` and the UI
-  dropdown automatically after a backend restart. No code changes needed.
-- **Add another imagery catalogue** — `backend/app/catalog.py` holds a `CATALOGS` registry.
-  For a standard STAC API, add one `CatalogDef` with `kind="stac-api"` (set `stac_url`,
-  `collections`, `asset_key`) — it shows up in the frontend dropdown automatically via
-  `GET /catalogs`. Non-STAC/static sources (like Maxar Open Data, see `app/maxar.py`) use a
-  custom `kind` with its own handler. All sources return the same scene dict shape (the
-  frontend keys off `visual_href` + `bbox`). Non-true-color collections need a band-
-  compositing step before `geo.read_patch` returns RGB.
-- **Tune inference** — generation params live as constants in
-  `backend/app/inference/pipeline.py` (`RESOLUTION`, `NUM_INFERENCE_STEPS`,
-  `GUIDANCE_SCALE`, `STRENGTH`). They mirror `notebooks/sanity_check_inpaint.ipynb`; keep the two
-  in sync so prod matches what you validate while training.
-- **Heavier scale** — inference is **synchronous, in-process, and lock-serialized** (one
-  request at a time), which is fine for a demo/single user. To support concurrency, move
-  `engine.infer` behind a job queue (e.g. a worker process + `/jobs/{id}` polling) and have
-  the frontend poll instead of awaiting `/inpaint` directly.
-- **Frontend** — `frontend/src/`:
-  `CatalogPanel.tsx` (search), `PromptPanel.tsx` (model/prompt/mask controls),
-  `MapView.tsx` (OpenLayers map, COG streaming, polygon draw, result overlays),
-  `App.tsx` (state wiring), `api.ts` (typed backend client). `npm run build` runs the
-  TypeScript type-check.
-
-## Datasets & training
-
-Dataset prep and LoRA training live in `notebooks/` — see [`notebooks/README.md`](notebooks/README.md).
-Generated images, masks, dataset files, model weights, and `notebooks/outputs/` are git-ignored.

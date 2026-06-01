@@ -8,16 +8,17 @@ workflow, read [`README.md`](README.md) first; this file is the quick operationa
 A web app for **inpainting open satellite imagery**: search STAC catalogues (Sentinel-2 via
 Earth Search) → stream a Cloud Optimized GeoTIFF (COG) onto an OpenLayers map → draw a
 polygon → prompt → pick a model → get an inpainted patch back. Models are SD1.5-inpainting
-+ LoRA adapters trained in `notebooks/`.
+
+- LoRA adapters trained in `notebooks/`.
 
 ## Repo layout
 
-| Dir          | Stack            | Entry points                                              |
-|--------------|------------------|-----------------------------------------------------------|
-| `frontend/`  | React/Vite/TS/OL | `src/App.tsx`, `src/api.ts` ([README](frontend/README.md))|
+| Dir          | Stack            | Entry points                                                      |
+| ------------ | ---------------- | ----------------------------------------------------------------- |
+| `frontend/`  | React/Vite/TS/OL | `src/App.tsx`, `src/api.ts` ([README](frontend/README.md))        |
 | `backend/`   | FastAPI + `uv`   | `app/main.py`, `app/routers/api.py` ([README](backend/README.md)) |
-| `notebooks/` | diffusers/peft   | LoRA training + dataset prep ([README](notebooks/README.md)) |
-| `scripts/`   | —                | `export_lora.py` (notebook adapter → `backend/models/`)   |
+| `notebooks/` | diffusers/peft   | LoRA training + dataset prep ([README](notebooks/README.md))      |
+| `scripts/`   | —                | `export_lora.py` (notebook adapter → `backend/models/`)           |
 
 ## Commands
 
@@ -27,6 +28,8 @@ npm ci
 npm run build      # tsc -b + vite build — THE type-check/CI gate. Run before committing TS changes.
 npm run dev        # http://localhost:5173
 npm run lint
+npm run format       # prettier --write . (format in place)
+npm run format:check # prettier --check . (CI-friendly, no writes)
 
 # Backend (cd backend) — needs a CUDA GPU for real inference
 uv sync
@@ -71,7 +74,7 @@ There is no backend test suite yet. To smoke-check backend modules without a GPU
 - **All frontend backend calls** go through `frontend/src/api.ts`.
 - **Catalogue registry** in `app/catalog.py` (`CATALOGS`): `sentinel-2` (`stac-api`, Earth
   Search, global 10 m) and `maxar` (`maxar-opendata`, ~0.5 m, disaster events only). Maxar is a
-  *static* STAC catalogue handled in `app/maxar.py` via the opengeos per-event GeoJSON indexes
+  _static_ STAC catalogue handled in `app/maxar.py` via the opengeos per-event GeoJSON indexes
   (event-based: `GET /catalog/events` then search with `event`). Add a global STAC source by
   appending a `stac-api` `CatalogDef`; it auto-appears in the frontend via `GET /catalogs`.
   Non-true-color collections need band compositing before `geo.read_patch`.

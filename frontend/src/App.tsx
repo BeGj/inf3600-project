@@ -9,7 +9,13 @@ import type { RestoreSnapshot } from "./PromptPanel";
 import CatalogPanel from "./CatalogPanel";
 import GeneratedImagesList from "./GeneratedImagesList";
 import { getModels, inpaint } from "./api";
-import type { BBox, InpaintOptions, InpaintStatusEvent, ModelInfo, Scene } from "./api";
+import type {
+  BBox,
+  InpaintOptions,
+  InpaintStatusEvent,
+  ModelInfo,
+  Scene,
+} from "./api";
 import "./App.css";
 
 export default function App() {
@@ -25,8 +31,11 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [clearKey, setClearKey] = useState(0);
-  const [hoverBBox, setHoverBBox] = useState<[number, number, number, number] | null>(null);
-  const [restoreSnapshot, setRestoreSnapshot] = useState<RestoreSnapshot | null>(null);
+  const [hoverBBox, setHoverBBox] = useState<
+    [number, number, number, number] | null
+  >(null);
+  const [restoreSnapshot, setRestoreSnapshot] =
+    useState<RestoreSnapshot | null>(null);
   const mapRef = useRef<Map | null>(null);
 
   // Load available models once.
@@ -39,7 +48,9 @@ export default function App() {
         const first = m.find((x) => x.available) ?? m[0];
         if (first) setModelId(first.id);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      );
   }, []);
 
   // Current map view extent in WGS-84, for catalogue search.
@@ -47,7 +58,11 @@ export default function App() {
     const map = mapRef.current;
     if (!map) return null;
     const extent3857 = map.getView().calculateExtent(map.getSize());
-    const [lngMin, latMin, lngMax, latMax] = transformExtent(extent3857, "EPSG:3857", "EPSG:4326");
+    const [lngMin, latMin, lngMax, latMax] = transformExtent(
+      extent3857,
+      "EPSG:3857",
+      "EPSG:4326",
+    );
     return { lngMin, latMin, lngMax, latMax };
   }, []);
 
@@ -56,7 +71,12 @@ export default function App() {
     const positions = geojson.coordinates.flat();
     const lngs = positions.map((p) => p[0]);
     const lats = positions.map((p) => p[1]);
-    return { lngMin: Math.min(...lngs), latMin: Math.min(...lats), lngMax: Math.max(...lngs), latMax: Math.max(...lats) };
+    return {
+      lngMin: Math.min(...lngs),
+      latMin: Math.min(...lats),
+      lngMax: Math.max(...lngs),
+      latMax: Math.max(...lats),
+    };
   }, []);
 
   const handleMaskDrawn = useCallback((geojson: Polygon) => {
@@ -104,7 +124,11 @@ export default function App() {
       latMax = Math.max(latMax, s.bbox[3]);
     }
     const viewProj = map.getView().getProjection();
-    const extent = transformExtent([lngMin, latMin, lngMax, latMax], "EPSG:4326", viewProj);
+    const extent = transformExtent(
+      [lngMin, latMin, lngMax, latMax],
+      "EPSG:4326",
+      viewProj,
+    );
     map.getView().fit(extent, { duration: 600, padding: [40, 40, 40, 40] });
   }, []);
 
@@ -118,13 +142,20 @@ export default function App() {
       try {
         const bbox = bboxFromMask(mask);
         const result = await inpaint(
-          bbox, mask, prompt, scene.visual_href, modelId, opts,
+          bbox,
+          mask,
+          prompt,
+          scene.visual_href,
+          modelId,
+          opts,
           (evt: InpaintStatusEvent) => {
             if (evt.phase === "downloading_model") {
               const m = Math.floor(evt.elapsedTotalS / 60);
               const s = Math.floor(evt.elapsedTotalS % 60);
               const elapsed = m > 0 ? `${m}m ${s}s` : `${s}s`;
-              setStatusMessage(`Downloading FLUX model (~34 GB)… This only happens once. Elapsed: ${elapsed}`);
+              setStatusMessage(
+                `Downloading FLUX model (~34 GB)… This only happens once. Elapsed: ${elapsed}`,
+              );
             } else if (evt.phase === "running") {
               setStatusMessage("Running inference…");
             }
@@ -154,7 +185,7 @@ export default function App() {
         setStatusMessage(null);
       }
     },
-    [scene, mask, maskId, modelId, bboxFromMask]
+    [scene, mask, maskId, modelId, bboxFromMask],
   );
 
   const handleRemoveOverlay = useCallback((id: string) => {
@@ -162,16 +193,21 @@ export default function App() {
   }, []);
 
   const handleToggleOverlay = useCallback((id: string) => {
-    setOverlays((prev) => prev.map((o) => o.maskId === id ? { ...o, visible: !o.visible } : o));
+    setOverlays((prev) =>
+      prev.map((o) => (o.maskId === id ? { ...o, visible: !o.visible } : o)),
+    );
   }, []);
 
-  const handleZoomToOverlay = useCallback((bbox: [number, number, number, number]) => {
-    const map = mapRef.current;
-    if (!map) return;
-    const viewProj = map.getView().getProjection();
-    const extent = transformExtent(bbox, "EPSG:4326", viewProj);
-    map.getView().fit(extent, { duration: 600, padding: [40, 40, 40, 40] });
-  }, []);
+  const handleZoomToOverlay = useCallback(
+    (bbox: [number, number, number, number]) => {
+      const map = mapRef.current;
+      if (!map) return;
+      const viewProj = map.getView().getProjection();
+      const extent = transformExtent(bbox, "EPSG:4326", viewProj);
+      map.getView().fit(extent, { duration: 600, padding: [40, 40, 40, 40] });
+    },
+    [],
+  );
 
   const handleEditOverlay = useCallback((overlay: ResultOverlay) => {
     setMask(overlay.mask);
@@ -200,7 +236,14 @@ export default function App() {
   return (
     <div className="app-root">
       <div className="side-panel">
-        <CatalogPanel getViewBBox={getViewBBox} selectedSceneId={scene?.id ?? null} onSelectScene={handleSelectScene} onHoverScene={handleHoverScene} onClearScene={handleClearScene} onFitResults={fitToResults} />
+        <CatalogPanel
+          getViewBBox={getViewBBox}
+          selectedSceneId={scene?.id ?? null}
+          onSelectScene={handleSelectScene}
+          onHoverScene={handleHoverScene}
+          onClearScene={handleClearScene}
+          onFitResults={fitToResults}
+        />
         <PromptPanel
           models={models}
           modelId={modelId}
@@ -208,8 +251,18 @@ export default function App() {
           sceneReady={!!scene}
           drawingActive={drawingActive}
           maskReady={!!mask}
-          onStartDraw={() => { setMask(null); setPreloadMask(null); setDrawingActive(true); setClearKey((k) => k + 1); }}
-          onClearMask={() => { setMask(null); setPreloadMask(null); setDrawingActive(false); setClearKey((k) => k + 1); }}
+          onStartDraw={() => {
+            setMask(null);
+            setPreloadMask(null);
+            setDrawingActive(true);
+            setClearKey((k) => k + 1);
+          }}
+          onClearMask={() => {
+            setMask(null);
+            setPreloadMask(null);
+            setDrawingActive(false);
+            setClearKey((k) => k + 1);
+          }}
           onGenerate={handleGenerate}
           loading={loading}
           statusMessage={statusMessage}
@@ -234,11 +287,15 @@ export default function App() {
           preloadMask={preloadMask}
           onMaskDrawn={handleMaskDrawn}
           onInvalidDraw={handleInvalidDraw}
-          onMapReady={(map) => { mapRef.current = map; }}
+          onMapReady={(map) => {
+            mapRef.current = map;
+          }}
         />
         {overlays.length > 0 && (
           <div className="overlay-controls">
-            <button className="primary" onClick={handleDownload}>Download Last Patch</button>
+            <button className="primary" onClick={handleDownload}>
+              Download Last Patch
+            </button>
           </div>
         )}
       </div>

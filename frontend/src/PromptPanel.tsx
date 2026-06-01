@@ -67,7 +67,9 @@ export default function PromptPanel({
   const [negativePrompt, setNegativePrompt] = useState("");
   const [guidanceScale, setGuidanceScale] = useState(DEFAULT_GUIDANCE_SCALE);
   const [strength, setStrength] = useState(DEFAULT_STRENGTH);
-  const [numInferenceSteps, setNumInferenceSteps] = useState(DEFAULT_NUM_INFERENCE_STEPS);
+  const [numInferenceSteps, setNumInferenceSteps] = useState(
+    DEFAULT_NUM_INFERENCE_STEPS,
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
@@ -87,24 +89,43 @@ export default function PromptPanel({
   const isFlux = selected?.family === "flux-fill";
   useEffect(() => {
     if (selected && prompt.trim() === "") setPrompt(selected.default_prompt);
-    if (selected && negativePrompt.trim() === "") setNegativePrompt(selected.negative_prompt);
+    if (selected && negativePrompt.trim() === "")
+      setNegativePrompt(selected.negative_prompt);
     if (selected) {
-      setGuidanceScale(selected.family === "flux-fill" ? FLUX_GUIDANCE_SCALE : DEFAULT_GUIDANCE_SCALE);
+      setGuidanceScale(
+        selected.family === "flux-fill"
+          ? FLUX_GUIDANCE_SCALE
+          : DEFAULT_GUIDANCE_SCALE,
+      );
       setNumInferenceSteps(
-        selected.family === "flux-fill" ? FLUX_NUM_INFERENCE_STEPS : DEFAULT_NUM_INFERENCE_STEPS
+        selected.family === "flux-fill"
+          ? FLUX_NUM_INFERENCE_STEPS
+          : DEFAULT_NUM_INFERENCE_STEPS,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId]);
 
   return (
-    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.75rem", color: "#eee" }}>
+    <div
+      style={{
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        color: "#eee",
+      }}
+    >
       <h2 style={{ margin: 0, fontSize: "1rem" }}>Generative Fill</h2>
 
       {/* Model selector — driven by GET /models */}
       <label style={{ fontSize: "0.8rem" }}>
         Model
-        <select value={modelId} onChange={(e) => onModelChange(e.target.value)} style={inputStyle}>
+        <select
+          value={modelId}
+          onChange={(e) => onModelChange(e.target.value)}
+          style={inputStyle}
+        >
           {models.length === 0 && <option value="">Loading…</option>}
           {models.map((m) => (
             <option key={m.id} value={m.id} disabled={!m.available}>
@@ -119,14 +140,29 @@ export default function PromptPanel({
         <button
           onClick={onStartDraw}
           disabled={drawingActive || loading || !sceneReady}
-          style={{ flex: 1, padding: "0.4rem", background: drawingActive ? "#555" : "#2a6", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer" }}
+          style={{
+            flex: 1,
+            padding: "0.4rem",
+            background: drawingActive ? "#555" : "#2a6",
+            border: "none",
+            borderRadius: 4,
+            color: "#fff",
+            cursor: "pointer",
+          }}
         >
           {drawingActive ? "Drawing…" : "Draw Mask"}
         </button>
         <button
           onClick={onClearMask}
           disabled={loading || (!maskReady && !drawingActive)}
-          style={{ padding: "0.4rem 0.8rem", background: "#555", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer" }}
+          style={{
+            padding: "0.4rem 0.8rem",
+            background: "#555",
+            border: "none",
+            borderRadius: 4,
+            color: "#fff",
+            cursor: "pointer",
+          }}
         >
           Clear
         </button>
@@ -172,7 +208,9 @@ export default function PromptPanel({
         {showAdvanced ? "▾ Advanced options" : "▸ Advanced options"}
       </button>
       {showAdvanced && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div
+          style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}
+        >
           <label style={{ fontSize: "0.75rem" }}>
             Guidance scale (prompt adherence): {guidanceScale}
             <input
@@ -224,7 +262,9 @@ export default function PromptPanel({
             numInferenceSteps,
           })
         }
-        disabled={loading || !sceneReady || !maskReady || !prompt.trim() || !modelId}
+        disabled={
+          loading || !sceneReady || !maskReady || !prompt.trim() || !modelId
+        }
         style={{
           padding: "0.6rem",
           background: loading ? "#555" : "#4a9eff",
@@ -239,19 +279,31 @@ export default function PromptPanel({
         {loading ? "Generating…" : "Generate"}
       </button>
 
-      {!sceneReady && <p style={{ margin: 0, fontSize: "0.75rem", color: "#aaa" }}>Search and select a scene first.</p>}
-      {sceneReady && maskReady && !loading && <p style={{ margin: 0, fontSize: "0.75rem", color: "#8f8" }}>Mask ready.</p>}
+      {!sceneReady && (
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "#aaa" }}>
+          Search and select a scene first.
+        </p>
+      )}
+      {sceneReady && maskReady && !loading && (
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "#8f8" }}>
+          Mask ready.
+        </p>
+      )}
       {loading && statusMessage && (
-        <p style={{
-          margin: 0,
-          fontSize: "0.75rem",
-          color: statusMessage.startsWith("Downloading") ? "#f0a500" : "#ccc",
-          lineHeight: 1.4,
-        }}>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.75rem",
+            color: statusMessage.startsWith("Downloading") ? "#f0a500" : "#ccc",
+            lineHeight: 1.4,
+          }}
+        >
           {statusMessage}
         </p>
       )}
-      {error && <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>}
+      {error && (
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>
+      )}
     </div>
   );
 }

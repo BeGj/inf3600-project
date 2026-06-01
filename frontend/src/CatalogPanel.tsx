@@ -35,7 +35,14 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectScene, onHoverScene, onClearScene, onFitResults }: CatalogPanelProps) {
+export default function CatalogPanel({
+  getViewBBox,
+  selectedSceneId,
+  onSelectScene,
+  onHoverScene,
+  onClearScene,
+  onFitResults,
+}: CatalogPanelProps) {
   const initialRange = defaultDateRange();
   const [catalogs, setCatalogs] = useState<CatalogInfo[]>([]);
   const [catalogId, setCatalogId] = useState("");
@@ -57,7 +64,9 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
         setCatalogs(cs);
         if (cs.length > 0) setCatalogId(cs[0].id);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      );
   }, []);
 
   // Load events when an event-based catalogue is selected.
@@ -70,7 +79,9 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
         setEvents(evs);
         if (evs.length > 0) setEventId(evs[0].id);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      );
   }, [catalogId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = async () => {
@@ -98,7 +109,11 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
       result.sort((a, b) => (b.datetime ?? "").localeCompare(a.datetime ?? ""));
       setScenes(result);
       if (result.length === 0) {
-        setError(catalog.requires_event ? "No tiles for this event in view — try zooming out." : "No scenes found for this view/filters.");
+        setError(
+          catalog.requires_event
+            ? "No tiles for this event in view — try zooming out."
+            : "No scenes found for this view/filters.",
+        );
       } else if (catalog.requires_event) {
         // Event imagery is elsewhere than the user's current view — fly there.
         onFitResults(result);
@@ -111,15 +126,30 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
   };
 
   return (
-    <div style={{ padding: "1rem", display: "flex", flexDirection: "column", gap: "0.6rem", color: "#eee", borderBottom: "1px solid #333" }}>
+    <div
+      style={{
+        padding: "1rem",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.6rem",
+        color: "#eee",
+        borderBottom: "1px solid #333",
+      }}
+    >
       <h2 style={{ margin: 0, fontSize: "1rem" }}>Find imagery</h2>
 
       <label style={{ fontSize: "0.75rem" }}>
         Catalogue
-        <select value={catalogId} onChange={(e) => setCatalogId(e.target.value)} style={inputStyle}>
+        <select
+          value={catalogId}
+          onChange={(e) => setCatalogId(e.target.value)}
+          style={inputStyle}
+        >
           {catalogs.length === 0 && <option value="">Loading…</option>}
           {catalogs.map((c) => (
-            <option key={c.id} value={c.id}>{c.label}</option>
+            <option key={c.id} value={c.id}>
+              {c.label}
+            </option>
           ))}
         </select>
       </label>
@@ -132,10 +162,16 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
       {catalog?.requires_event && (
         <label style={{ fontSize: "0.75rem" }}>
           Event
-          <select value={eventId} onChange={(e) => setEventId(e.target.value)} style={inputStyle}>
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            style={inputStyle}
+          >
             {events.length === 0 && <option value="">Loading…</option>}
             {events.map((ev) => (
-              <option key={ev.id} value={ev.id}>{ev.label}</option>
+              <option key={ev.id} value={ev.id}>
+                {ev.label}
+              </option>
             ))}
           </select>
         </label>
@@ -145,11 +181,21 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <label style={{ fontSize: "0.75rem", flex: 1 }}>
             From
-            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} style={inputStyle} />
+            <input
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              style={inputStyle}
+            />
           </label>
           <label style={{ fontSize: "0.75rem", flex: 1 }}>
             To
-            <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} style={inputStyle} />
+            <input
+              type="date"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+              style={inputStyle}
+            />
           </label>
         </div>
       )}
@@ -157,31 +203,68 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
       {catalog?.supports_cloud && (
         <label style={{ fontSize: "0.75rem" }}>
           Max cloud cover: {maxCloud}%
-          <input type="range" min={0} max={100} value={maxCloud} onChange={(e) => setMaxCloud(Number(e.target.value))} style={{ width: "100%" }} />
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={maxCloud}
+            onChange={(e) => setMaxCloud(Number(e.target.value))}
+            style={{ width: "100%" }}
+          />
         </label>
       )}
 
       <button
         onClick={handleSearch}
         disabled={loading || !catalog}
-        style={{ padding: "0.5rem", background: loading ? "#555" : "#4a9eff", border: "none", borderRadius: 4, color: "#fff", fontWeight: "bold", cursor: "pointer" }}
+        style={{
+          padding: "0.5rem",
+          background: loading ? "#555" : "#4a9eff",
+          border: "none",
+          borderRadius: 4,
+          color: "#fff",
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
       >
-        {loading ? "Searching…" : catalog?.requires_event ? "Search event" : "Search this view"}
+        {loading
+          ? "Searching…"
+          : catalog?.requires_event
+            ? "Search event"
+            : "Search this view"}
       </button>
 
-      {error && <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>}
+      {error && (
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "#f88" }}>{error}</p>
+      )}
 
       {selectedSceneId && (
         <button
           onClick={onClearScene}
-          style={{ padding: "0.4rem", background: "#444", border: "none", borderRadius: 4, color: "#fff", cursor: "pointer", fontSize: "0.8rem" }}
+          style={{
+            padding: "0.4rem",
+            background: "#444",
+            border: "none",
+            borderRadius: 4,
+            color: "#fff",
+            cursor: "pointer",
+            fontSize: "0.8rem",
+          }}
         >
           Clear selected image
         </button>
       )}
 
       {scenes.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", maxHeight: 260, overflowY: "auto" }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.4rem",
+            maxHeight: 260,
+            overflowY: "auto",
+          }}
+        >
           {scenes.map((scene) => {
             const active = scene.id === selectedSceneId;
             return (
@@ -204,12 +287,20 @@ export default function CatalogPanel({ getViewBBox, selectedSceneId, onSelectSce
                 }}
               >
                 {scene.thumbnail && (
-                  <img src={scene.thumbnail} alt="" width={48} height={48} style={{ objectFit: "cover", borderRadius: 3 }} />
+                  <img
+                    src={scene.thumbnail}
+                    alt=""
+                    width={48}
+                    height={48}
+                    style={{ objectFit: "cover", borderRadius: 3 }}
+                  />
                 )}
                 <span style={{ fontSize: "0.7rem", lineHeight: 1.3 }}>
                   {scene.datetime?.slice(0, 10) ?? "unknown date"}
                   <br />
-                  {scene.cloud_cover != null ? `${scene.cloud_cover.toFixed(0)}% cloud` : ""}
+                  {scene.cloud_cover != null
+                    ? `${scene.cloud_cover.toFixed(0)}% cloud`
+                    : ""}
                 </span>
               </button>
             );

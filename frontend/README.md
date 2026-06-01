@@ -20,7 +20,7 @@ in a `frontend/.env` file if your backend runs elsewhere.
 ## Source map (`src/`)
 
 | File               | Responsibility                                                                  |
-|--------------------|---------------------------------------------------------------------------------|
+| ------------------ | ------------------------------------------------------------------------------- |
 | `App.tsx`          | Top-level state + wiring: models, selected scene, mask, overlays.               |
 | `api.ts`           | Typed backend client: `getModels`, `searchCatalog`, `inpaint`. All fetch calls. |
 | `CatalogPanel.tsx` | Imagery search (date / cloud filters) over the current map view; scene list.    |

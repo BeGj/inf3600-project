@@ -60,7 +60,12 @@ export interface CatalogSearchParams {
   limit?: number;
 }
 
-export type JobPhase = "queued" | "downloading_model" | "running" | "done" | "error";
+export type JobPhase =
+  | "queued"
+  | "downloading_model"
+  | "running"
+  | "done"
+  | "error";
 
 export interface InpaintStatusEvent {
   phase: JobPhase;
@@ -85,12 +90,16 @@ export async function getCatalogs(): Promise<CatalogInfo[]> {
 }
 
 export async function getEvents(catalogId: string): Promise<CatalogEvent[]> {
-  const res = await fetch(`${BASE_URL}/catalog/events?catalog=${encodeURIComponent(catalogId)}`);
+  const res = await fetch(
+    `${BASE_URL}/catalog/events?catalog=${encodeURIComponent(catalogId)}`,
+  );
   if (!res.ok) throw new Error(`Failed to load events (${res.status})`);
   return res.json();
 }
 
-export async function searchCatalog(params: CatalogSearchParams): Promise<Scene[]> {
+export async function searchCatalog(
+  params: CatalogSearchParams,
+): Promise<Scene[]> {
   const res = await fetch(`${BASE_URL}/catalog/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -104,7 +113,9 @@ export async function searchCatalog(params: CatalogSearchParams): Promise<Scene[
     }),
   });
   if (!res.ok) {
-    throw new Error(`Catalogue search failed (${res.status}): ${await res.text()}`);
+    throw new Error(
+      `Catalogue search failed (${res.status}): ${await res.text()}`,
+    );
   }
   return res.json();
 }
@@ -125,12 +136,18 @@ async function pollUntilDone(
     const res = await fetch(`${BASE_URL}/jobs/${jobId}`);
     if (!res.ok) throw new Error(`Job poll failed (${res.status})`);
     const job = await res.json();
-    onStatus({ phase: job.status, message: job.message, elapsedTotalS: job.elapsed_total_s });
+    onStatus({
+      phase: job.status,
+      message: job.message,
+      elapsedTotalS: job.elapsed_total_s,
+    });
     if (job.status === "done") {
-      if (!job.result_b64 || !job.result_bbox) throw new Error("Job done but no result");
+      if (!job.result_b64 || !job.result_bbox)
+        throw new Error("Job done but no result");
       return { image_b64: job.result_b64, bbox: job.result_bbox };
     }
-    if (job.status === "error") throw new Error(job.error ?? "Job failed with unknown error");
+    if (job.status === "error")
+      throw new Error(job.error ?? "Job failed with unknown error");
   }
 }
 
@@ -150,10 +167,13 @@ export async function inpaint(
     image_url: imageUrl,
     model_id: modelId,
   };
-  if (opts.negativePrompt !== undefined) body.negative_prompt = opts.negativePrompt;
-  if (opts.guidanceScale !== undefined) body.guidance_scale = opts.guidanceScale;
+  if (opts.negativePrompt !== undefined)
+    body.negative_prompt = opts.negativePrompt;
+  if (opts.guidanceScale !== undefined)
+    body.guidance_scale = opts.guidanceScale;
   if (opts.strength !== undefined) body.strength = opts.strength;
-  if (opts.numInferenceSteps !== undefined) body.num_inference_steps = opts.numInferenceSteps;
+  if (opts.numInferenceSteps !== undefined)
+    body.num_inference_steps = opts.numInferenceSteps;
 
   const res = await fetch(`${BASE_URL}/inpaint`, {
     method: "POST",
