@@ -5,7 +5,8 @@ catalogues (Sentinel-2 via Earth Search), stream the selected Cloud Optimized Ge
 (COG) onto a map, draw a polygon over an area, type what should appear there, pick a
 model, and get back an inpainted patch overlaid in place.
 
-[Link to demo video](https://youtu.be/oKv8LfeDaoA)
+- [Link to first demo video, in norwegian ](https://youtu.be/oKv8LfeDaoA)
+- [Link to seconds demo video, in english ](https://youtu.be/Bh6gexczSmc)
 
 ```
 ┌─────────────┐   /catalog/search   ┌──────────────┐  pystac-client   ┌──────────────┐
