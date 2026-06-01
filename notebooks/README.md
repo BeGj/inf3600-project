@@ -7,7 +7,6 @@ in VS Code) with the project's `.venv` kernel.
 
 ```powershell
 uv sync
-uv run jupyter lab
 ```
 
 GPU is assumed (CUDA 12.8 wheels are pinned in `pyproject.toml`). Generated
@@ -31,50 +30,84 @@ activate that locally run `uv tool install nbstripout && nbstripout --install`.
 
 ```
 notebooks/
-  prepare/                  data-prep scripts (HF dataset -> image/mask pairs)
-  train_houses_lora.ipynb   active LoRA training notebooks
+  prepare/                          data-prep scripts (source dataset -> image/mask pairs)
+    prepare_houses.py
+    prepare_trees.py
+    prepare_osm_sentinel.py
+  train_houses_lora.ipynb           single-class LoRA training notebooks
   train_trees_lora.ipynb
-  sanity_check_inpaint.ipynb base-model inpaint sanity check
-  exploration/              kept-for-reference experiments (not the active pipeline)
-  outputs/                  trained adapters + sample renders (git-ignored)
+  train_sentinel_water_lora.ipynb
+  train_small_house_set_lora.ipynb
+  train_small_tree_set_lora.ipynb
+  train_osm_lora.py                 multi-class Nordic LoRA training (script)
+  sanity_check_inpaint.ipynb        base-model inpaint sanity checks
+  sanity_check_inpaint_split.ipynb
+  fid_base_vs_lora_inpaint.ipynb    base vs LoRA FID evaluation
+  fid_base_vs_lora_inpaint_osm_lora.ipynb
+  exploration/                      kept-for-reference experiments (not the active pipeline)
+  outputs/                          trained adapters + sample renders (git-ignored)
 ```
+
+Two kinds of artifacts live here: **`.ipynb` notebooks** for interactive training and
+evaluation, and a couple of **`.py` scripts** (`prepare/*.py`, `train_osm_lora.py`) for
+longer non-interactive runs you launch with `uv run python ...`.
 
 ## Dataset preparation
 
 The training notebooks read prepared datasets from `../datasets/`. Generate them
-first with the scripts under `prepare/`:
+first with the scripts under `prepare/`. Each script writes images, masks, and a
+`metadata.jsonl` manifest in the same on-disk format.
 
 ```powershell
+# Single-class HF-sourced datasets
 uv run python prepare/prepare_houses.py --output-dir ../datasets/houses
 uv run python prepare/prepare_trees.py  --output-dir ../datasets/trees
+
+# Multi-class Nordic dataset from live Sentinel-2 + ESA WorldCover land cover
+uv run python prepare/prepare_osm_sentinel.py --output-dir ../datasets/osm_nordic
 ```
 
-Each script writes images, masks, and a `metadata.jsonl` manifest.
+| Script                    | Source                                                                                                                                                                                                               | Output                |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `prepare_houses.py`       | HF dataset → image/mask pairs                                                                                                                                                                                        | `datasets/houses`     |
+| `prepare_trees.py`        | HF dataset → image/mask pairs                                                                                                                                                                                        | `datasets/trees`      |
+| `prepare_osm_sentinel.py` | Samples Nordic tiles, reads ESA WorldCover 2021 land cover (free 10 m COG) to label/mask, pulls cloud-free Sentinel-2 patches from Earth Search. 9 land-cover classes, each record carries its own per-class prompt. | `datasets/osm_nordic` |
 
-## Notebooks
+## Notebooks & scripts
 
 ### Training
 
-| Notebook | Purpose |
-| --- | --- |
-| `train_houses_lora.ipynb` | Self-contained LoRA training for `stable-diffusion-v1-5/stable-diffusion-inpainting`. Reads `datasets/houses` and saves website-ready adapter weights to `notebooks/outputs/lora_houses`. Uses 🤗 `accelerate` and locates the repo root automatically. |
-| `train_trees_lora.ipynb` | Same pipeline as the houses notebook, but trains on `datasets/trees` and writes to `notebooks/outputs/lora_trees`. |
+All training targets `stable-diffusion-v1-5/stable-diffusion-inpainting`, uses 🤗
+`accelerate`, locates the repo root automatically, and writes adapters under
+`notebooks/outputs/`.
 
-### Inference / testing
+| File                               | Reads                      | Writes                                      | Notes                                                                                                                                                                                                               |
+| ---------------------------------- | -------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `train_houses_lora.ipynb`          | `datasets/houses`          | `outputs/lora_houses`                       | Self-contained single-class LoRA training.                                                                                                                                                                          |
+| `train_trees_lora.ipynb`           | `datasets/trees`           | `outputs/lora_trees`                        | Same pipeline, trees class.                                                                                                                                                                                         |
+| `train_sentinel_water_lora.ipynb`  | `datasets/sentinel_water`  | `outputs/lora_sentinel_water_sd15_inpaint`  | Water class on Sentinel-2 patches.                                                                                                                                                                                  |
+| `train_small_house_set_lora.ipynb` | `datasets/small_house_set` | `outputs/lora_small_house_set_sd15_inpaint` | Small-dataset house variant.                                                                                                                                                                                        |
+| `train_small_tree_set_lora.ipynb`  | `datasets/small_tree_set`  | `outputs/lora_small_tree_set_sd15_inpaint`  | Small-dataset tree variant.                                                                                                                                                                                         |
+| `train_osm_lora.py` (script)       | `datasets/osm_nordic`      | `outputs/`                                  | Multi-class Nordic LoRA. Per-class prompts, cosine LR (100-step warmup + 3000 steps), mask-weighted loss, flip/rotation augmentation, holds out the last record per class for validation. Logs to Weights & Biases. |
 
-| Notebook | Purpose |
-| --- | --- |
-| `sanity_check_inpaint.ipynb` | Minimal sanity check for SD 1.5 inpainting. Deliberately ignores the rest of the repo: loads one image + one mask from a prepared dataset and runs the base `stable-diffusion-v1-5/stable-diffusion-inpainting` model — no LoRA, backend, or crop logic. Useful for confirming an image/mask pair is correct (white pixels are repainted). |
+### Inference / evaluation
+
+| File                                      | Purpose                                                                                                                                                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sanity_check_inpaint.ipynb`              | Minimal sanity check for SD 1.5 inpainting. Deliberately ignores the rest of the repo: loads one image + one mask from a prepared dataset and runs the base model — no LoRA, backend, or crop logic. Useful for confirming an image/mask pair is correct (white pixels are repainted). |
+| `sanity_check_inpaint_split.ipynb`        | Same idea, but keeps model loading separate from inference settings — load the pipeline once, then tweak prompt / seed / strength / guidance / steps / LoRA scale in the settings cells and rerun only the inference cell.                                                             |
+| `fid_base_vs_lora_inpaint.ipynb`          | Runs the same masked inputs through the base model and the base + a selected LoRA, then computes FID for each generated set against the original dataset images (lower is better). Bump `NUM_SAMPLES` for a reliable score; defaults are small for a fast first run.                   |
+| `fid_base_vs_lora_inpaint_osm_lora.ipynb` | Same FID comparison wired up for the Nordic OSM LoRA / dataset.                                                                                                                                                                                                                        |
 
 ### Exploration (`exploration/`)
 
 Kept for reference; not part of the active inpainting pipeline.
 
-| Notebook | Purpose |
-| --- | --- |
-| `sd2_lora_finetune.ipynb` | Earlier LoRA fine-tuning experiment. Fine-tunes SD2 inpainting on the [`arampacha/rsicd`](https://huggingface.co/datasets/arampacha/rsicd) satellite caption dataset, training only ~3 MB of adapter weights. Hyperparameters are collected in a single `CFG` dict. Superseded by the `train_*_lora` notebooks. |
-| `explore_sd_inpaint.ipynb` | Interactive Stable Diffusion 3 inpainting playground. Upload an image with an `ipywidgets` uploader, draw a polygon mask on an `ipycanvas` canvas, set prompt / negative prompt, and run the `StableDiffusion3InpaintPipeline`. |
-| `explore_qwen_edit.ipynb` | Experiment with the `QwenImageEditPipeline` for instruction-based image editing, using 4-bit (bitsandbytes) quantization and an `ipywidgets` upload UI. |
+| Notebook                   | Purpose                                                                                                                                                                                                                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sd2_lora_finetune.ipynb`  | Earlier LoRA fine-tuning experiment. Fine-tunes SD2 inpainting on the [`arampacha/rsicd`](https://huggingface.co/datasets/arampacha/rsicd) satellite caption dataset, training only ~3 MB of adapter weights. Hyperparameters are collected in a single `CFG` dict. Superseded by the `train_*_lora` notebooks. |
+| `explore_sd_inpaint.ipynb` | Interactive Stable Diffusion 3 inpainting playground. Upload an image with an `ipywidgets` uploader, draw a polygon mask on an `ipycanvas` canvas, set prompt / negative prompt, and run the `StableDiffusion3InpaintPipeline`.                                                                                 |
+| `explore_qwen_edit.ipynb`  | Experiment with the `QwenImageEditPipeline` for instruction-based image editing, using 4-bit (bitsandbytes) quantization and an `ipywidgets` upload UI.                                                                                                                                                         |
 
 ## Conventions
 
