@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { InpaintOptions, ModelInfo } from "./api";
 
 // Backend defaults (backend/app/inference/pipeline.py) — kept in sync so the sliders
@@ -48,7 +48,7 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export default function PromptPanel({
+function PromptPanel({
   models,
   modelId,
   onModelChange,
@@ -307,3 +307,5 @@ export default function PromptPanel({
     </div>
   );
 }
+
+export default memo(PromptPanel);

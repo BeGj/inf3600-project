@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { ResultOverlay } from "./MapView";
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
   onEdit: (overlay: ResultOverlay) => void;
 }
 
-export default function GeneratedImagesList({
+function GeneratedImagesList({
   overlays,
   onRemove,
   onToggle,
@@ -61,3 +62,5 @@ export default function GeneratedImagesList({
     </div>
   );
 }
+
+export default memo(GeneratedImagesList);

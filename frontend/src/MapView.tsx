@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
@@ -62,7 +62,7 @@ const HIGHLIGHT_STYLE = {
   "fill-color": "rgba(74,158,255,0.08)",
 };
 
-export default function MapView({
+function MapView({
   cogUrl,
   overlays,
   drawingActive,
@@ -148,12 +148,16 @@ export default function MapView({
       const { extent, resolutions, ...viewRest } = opts;
       cogExtent.current = extent ?? null;
 
-      // The COG's native resolutions cap zoom-in at the finest overview. Append a few
-      // finer levels so users can zoom past native resolution (imagery oversamples).
+      // The COG's native resolutions strictly constrain the view: the coarsest overview
+      // (res[0]) caps zoom-out and the finest caps zoom-in. Prepend coarser levels so users
+      // can zoom back out to a regional/continental view, and append finer levels so they
+      // can zoom past native resolution (imagery oversamples). Resolutions stay descending.
       let res = resolutions;
       if (res && res.length > 0) {
+        const coarsest = res[0];
         const finest = res[res.length - 1];
-        res = [...res, finest / 2, finest / 4, finest / 8];
+        const zoomOut = [64, 32, 16, 8, 4, 2].map((f) => coarsest * f);
+        res = [...zoomOut, ...res, finest / 2, finest / 4, finest / 8];
       }
 
       // Decide whether to keep the user's current view: only move the map if the selected
@@ -348,3 +352,7 @@ export default function MapView({
 
   return <div ref={mapRef} style={{ width: "100%", height: "100%" }} />;
 }
+
+// Memoized: App re-renders on high-frequency state (scene hover, loading, status), but
+// MapView's props are otherwise unchanged — skip its render and its effect-diffing work.
+export default memo(MapView);

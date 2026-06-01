@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { getCatalogs, getEvents, searchCatalog } from "./api";
 import type { BBox, CatalogEvent, CatalogInfo, Scene } from "./api";
 
@@ -35,7 +35,7 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
 };
 
-export default function CatalogPanel({
+function CatalogPanel({
   getViewBBox,
   selectedSceneId,
   onSelectScene,
@@ -310,3 +310,5 @@ export default function CatalogPanel({
     </div>
   );
 }
+
+export default memo(CatalogPanel);

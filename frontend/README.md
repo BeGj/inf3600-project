@@ -11,7 +11,8 @@ workflow and architecture.
 npm ci
 npm run dev      # http://localhost:5173
 npm run build    # tsc type-check + production build (use this as the CI/lint gate)
-npm run lint     # ESLint
+npm run lint     # lint code using ESLint
+npm run format     # format code using pretrtier
 ```
 
 The backend base URL is read from `VITE_API_URL` (default `http://localhost:8000`); set it

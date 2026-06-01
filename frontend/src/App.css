@@ -37,6 +37,17 @@ body,
   overflow: hidden;
 }
 
+.map-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: #888;
+  font-family: system-ui, sans-serif;
+  font-size: 0.9rem;
+}
+
 .overlay-controls {
   position: absolute;
   bottom: 16px;

@@ -1,8 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import type { Polygon } from "geojson";
 import Map from "ol/Map";
 import { transformExtent } from "ol/proj";
-import MapView from "./MapView";
 import type { ResultOverlay } from "./MapView";
 import PromptPanel from "./PromptPanel";
 import type { RestoreSnapshot } from "./PromptPanel";
@@ -17,6 +23,11 @@ import type {
   Scene,
 } from "./api";
 import "./App.css";
+
+// OpenLayers + the COG/GeoTIFF stack is the bulk of the JS bundle (~900 KB). Code-split it
+// so the side panel (catalogue search) paints and becomes interactive immediately, while the
+// map library streams in. The map isn't usable until a scene is searched + selected anyway.
+const MapView = lazy(() => import("./MapView"));
 
 export default function App() {
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -53,14 +64,17 @@ export default function App() {
       );
   }, []);
 
-  // Current map view extent in WGS-84, for catalogue search.
+  // Current map view extent in WGS-84, for catalogue search. Read the view's *actual*
+  // projection — once a COG loads, the view switches to the image's native UTM projection,
+  // so hardcoding EPSG:3857 would misread UTM meters as Web Mercator and search the wrong place.
   const getViewBBox = useCallback((): BBox | null => {
     const map = mapRef.current;
     if (!map) return null;
-    const extent3857 = map.getView().calculateExtent(map.getSize());
+    const view = map.getView();
+    const extent = view.calculateExtent(map.getSize());
     const [lngMin, latMin, lngMax, latMax] = transformExtent(
-      extent3857,
-      "EPSG:3857",
+      extent,
+      view.getProjection(),
       "EPSG:4326",
     );
     return { lngMin, latMin, lngMax, latMax };
@@ -224,6 +238,24 @@ export default function App() {
     });
   }, []);
 
+  const handleStartDraw = useCallback(() => {
+    setMask(null);
+    setPreloadMask(null);
+    setDrawingActive(true);
+    setClearKey((k) => k + 1);
+  }, []);
+
+  const handleClearMask = useCallback(() => {
+    setMask(null);
+    setPreloadMask(null);
+    setDrawingActive(false);
+    setClearKey((k) => k + 1);
+  }, []);
+
+  const handleMapReady = useCallback((map: Map) => {
+    mapRef.current = map;
+  }, []);
+
   const handleDownload = useCallback(() => {
     if (overlays.length === 0) return;
     const last = overlays[overlays.length - 1];
@@ -251,18 +283,8 @@ export default function App() {
           sceneReady={!!scene}
           drawingActive={drawingActive}
           maskReady={!!mask}
-          onStartDraw={() => {
-            setMask(null);
-            setPreloadMask(null);
-            setDrawingActive(true);
-            setClearKey((k) => k + 1);
-          }}
-          onClearMask={() => {
-            setMask(null);
-            setPreloadMask(null);
-            setDrawingActive(false);
-            setClearKey((k) => k + 1);
-          }}
+          onStartDraw={handleStartDraw}
+          onClearMask={handleClearMask}
           onGenerate={handleGenerate}
           loading={loading}
           statusMessage={statusMessage}
@@ -278,19 +300,19 @@ export default function App() {
         />
       </div>
       <div className="map-container">
-        <MapView
-          cogUrl={scene?.visual_href ?? null}
-          overlays={overlays}
-          drawingActive={drawingActive}
-          clearKey={clearKey}
-          highlightBBox={hoverBBox}
-          preloadMask={preloadMask}
-          onMaskDrawn={handleMaskDrawn}
-          onInvalidDraw={handleInvalidDraw}
-          onMapReady={(map) => {
-            mapRef.current = map;
-          }}
-        />
+        <Suspense fallback={<div className="map-loading">Loading map…</div>}>
+          <MapView
+            cogUrl={scene?.visual_href ?? null}
+            overlays={overlays}
+            drawingActive={drawingActive}
+            clearKey={clearKey}
+            highlightBBox={hoverBBox}
+            preloadMask={preloadMask}
+            onMaskDrawn={handleMaskDrawn}
+            onInvalidDraw={handleInvalidDraw}
+            onMapReady={handleMapReady}
+          />
+        </Suspense>
         {overlays.length > 0 && (
           <div className="overlay-controls">
             <button className="primary" onClick={handleDownload}>
