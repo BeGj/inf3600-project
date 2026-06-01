@@ -7,6 +7,10 @@
 # Bare pattern: matches a dir named `outputs/` at any depth (notebooks/outputs/, etc.).
 outputs/
 
+# Weights & Biases local run cache (logs/media/event streams). The canonical copy lives
+# on wandb.ai and it's regenerated every run — never commit it.
+wandb/
+
 # Node
 **/node_modules/
 frontend/dist/
