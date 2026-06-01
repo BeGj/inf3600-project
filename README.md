@@ -5,6 +5,8 @@ catalogues (Sentinel-2 via Earth Search), stream the selected Cloud Optimized Ge
 (COG) onto a map, draw a polygon over an area, type what should appear there, pick a
 model, and get back an inpainted patch overlaid in place.
 
+[Link to demo video](https://youtu.be/oKv8LfeDaoA)
+
 ```
 ┌─────────────┐   /catalog/search   ┌──────────────┐  pystac-client   ┌──────────────┐
 │  frontend   │ ──────────────────▶ │   backend    │ ───────────────▶ │ Earth Search │
@@ -16,6 +18,8 @@ model, and get back an inpainted patch overlaid in place.
         │ streams the selected scene's COG directly (browser → S3) via OpenLayers
         └──────────────────────────────────────────────────────────────────────▶
 ```
+
+![Comparison of SD1.5 base and Nordic osm lora](.docs/image.png)
 
 Three parts of the repo:
 
@@ -109,3 +113,39 @@ npm run dev        # http://localhost:5173
 2. **Find imagery** → set date range + max cloud cover → **Search this view** → pick a scene.
 3. Choose a **Model**, **Draw Mask** over a region, edit the **Prompt**, then **Generate**.
 4. The inpainted patch overlays at the correct geographic extent; **Download Last Patch** saves it.
+
+## Demo images
+
+### Norwegian palace -> Lake
+
+![Generated inpaint of a lake instead of the Norwegian palace](image2.png)
+
+### Norwegian palace -> Forest
+
+![After](.docs/image-7.png)
+
+### Habitated island next to Tromsø
+
+Before
+![Before](.docs/image66.png)
+
+After
+![After 1](.docs/image-1.png)
+
+After
+![After 2](.docs/image-2.png)
+
+### Uninhabitated Tromsø
+
+Before
+![Before](.docs/image-3.png)
+
+After
+![After](.docs/image-4.png)
+
+### Bodø airport
+
+Before
+![Before](.docs/image-5.png)
+After
+![AFter](.docs/image-6.png)
