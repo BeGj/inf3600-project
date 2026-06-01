@@ -24,6 +24,7 @@ Three parts of the repo:
 | [`frontend/` ](./frontend/)  | React 19 + Vite + OpenLayers map UI ([details](frontend/README.md)).                                   |
 | [`backend/` ](./backend/)    | FastAPI service: catalogue search + COG reading + inpainting inference ([details](backend/README.md)). |
 | [`notebooks/`](./notebooks/) | LoRA training + dataset prep ([details](notebooks/README.md)).                                         |
+| [`datasets/`](./datasets//)  | Folder for manual and automatic datasets ([details](datasets/README.md)).                              |
 
 ## Prerequisites
 
