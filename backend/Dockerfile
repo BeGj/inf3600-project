@@ -1,5 +1,10 @@
 FROM python:3.12-slim-bullseye
 
+# Install git (needed to build the diffusers git dependency from source).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv (pin the version for reproducible builds).
 COPY --from=ghcr.io/astral-sh/uv:0.11.16 /uv /bin/uv
 
